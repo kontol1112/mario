@@ -1,0 +1,2064 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ray Game - Brutal Fatality Full Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body { background-color: #111; color: #fff; font-family: 'Nunito', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        #game-container {
+            position: relative; width: 100vw; height: 100vh; max-width: 1200px; max-height: 800px;
+            background-color: #5C94FC; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow: hidden;
+            transition: background-color 3s ease-in-out; 
+        }
+
+        #game-container.boss-arena { background-color: #1a1a24; }
+        #game-container.intro-dark { background-color: #000000; }
+
+        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; background: rgba(0, 0, 0, 0.6); z-index: 20; transition: opacity 0.5s ease;
+        }
+        .hidden { opacity: 0; pointer-events: none; display: none !important; }
+
+        #hud {
+            position: absolute; top: 15px; left: 20px; right: 20px; display: flex; justify-content: space-between;
+            align-items: flex-start; z-index: 10; transition: opacity 0.5s ease; pointer-events: none;
+        }
+        .hud-group { text-align: center; color: #fff; text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 4px 0 #000; }
+        .brand-container { text-align: left; }
+        .brand-title {
+            font-size: 2.2rem; font-weight: 900; color: #FFCE00; letter-spacing: 1px; margin-bottom: -5px;
+            text-shadow: 2px 2px 0 #D22824, -2px -2px 0 #D22824, 2px -2px 0 #D22824, -2px 2px 0 #D22824, 0 4px 0 #000;
+        }
+        .brand-subtitle { font-size: 1rem; font-weight: 700; color: #fff; padding-left: 5px; }
+        .hud-label { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; margin-bottom: -2px; }
+        .hud-value { font-size: 1.6rem; font-weight: 900; }
+        .hud-coin-icon {
+            display: inline-block; width: 18px; height: 24px; background-color: #F8B800; border: 2px solid #000;
+            border-radius: 50%; vertical-align: middle; margin-right: 5px; box-shadow: inset -4px 0 0 rgba(255,255,255,0.5);
+        }
+
+        #boss-hp-container {
+            animation: pulse-glow 2s infinite alternate;
+        }
+        #boss-hp-fill {
+            box-shadow: 0 0 15px #EF4444, inset 0 0 10px #fff;
+        }
+        @keyframes pulse-glow {
+            0% { text-shadow: 0 0 5px #F87171; }
+            100% { text-shadow: 0 0 20px #EF4444, 0 0 30px #B91C1C; }
+        }
+
+        .menu-title {
+            font-size: 5rem; font-weight: 900; color: #FFCE00;
+            text-shadow: 4px 4px 0 #D22824, -2px -2px 0 #D22824, 4px -2px 0 #D22824, -2px 4px 0 #D22824, 0 8px 0 #000;
+            letter-spacing: 3px; margin-bottom: 40px; text-align: center;
+        }
+        .btn {
+            padding: 15px 50px; font-size: 1.8rem; font-weight: 900; color: white; background: #4ADE80;
+            border: 4px solid #fff; border-radius: 15px; cursor: pointer;
+            box-shadow: 0 8px 0 #166534, 0 15px 20px rgba(0,0,0,0.4); transition: all 0.1s; font-family: inherit;
+            text-shadow: 2px 2px 0 #166534; pointer-events: auto; margin: 10px;
+        }
+        .btn:hover { background: #22C55E; transform: translateY(2px); box-shadow: 0 6px 0 #166534, 0 10px 15px rgba(0,0,0,0.4); }
+        .btn:active { transform: translateY(8px); box-shadow: 0 0 0 #166534; }
+        #controls-hint {
+            position: absolute; bottom: 30px; color: #fff; font-size: 1.2rem; font-weight: bold;
+            text-shadow: 2px 2px 0 #000; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 10px;
+        }
+        .btn-group { display: flex; gap: 20px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud" class="hidden">
+        <div class="brand-container">
+            <div class="brand-title">RAY<span style="color:#fff;"> GAME</span></div>
+            <div class="brand-subtitle">by Ray</div>
+        </div>
+        <div class="hud-group">
+            <div class="hud-label">LEVEL</div>
+            <div class="hud-value" id="ui-level">1-1</div>
+        </div>
+        <div class="hud-group">
+            <div class="hud-label">SCORE</div>
+            <div class="hud-value" id="ui-score">000000</div>
+        </div>
+        <div class="hud-group">
+            <div class="hud-label">COINS</div>
+            <div class="hud-value"><span class="hud-coin-icon"></span><span id="ui-coins">x 00</span></div>
+        </div>
+        <div class="hud-group">
+            <div class="hud-label">TIME</div>
+            <div class="hud-value" id="ui-time">300</div>
+        </div>
+        <div class="hud-group hidden" id="boss-hp-container" style="flex-grow: 1; padding: 0 20px;">
+            <div class="hud-label" id="boss-hp-label" style="color: #F87171;">THE FALLEN EYE</div>
+            <div style="width: 100%; height: 20px; background: #000; border: 3px solid #fff; border-radius: 10px; overflow: hidden; margin-top: 5px; position: relative; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);">
+                <div id="boss-hp-fill" style="width: 100%; height: 100%; background: #EF4444; transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="overlay">
+        <div class="menu-title">RAY GAME<br><span style="font-size: 2rem; color: white; text-shadow: 2px 2px 0 #000;">CINEMATIC FATALITY EDITION</span></div>
+        <button class="btn" id="btn-start">MULAI MAIN</button>
+        <div id="controls-hint">[ A ] [ D ] Bergerak &nbsp;&nbsp;|&nbsp;&nbsp; [ SPASI ] Lompat &nbsp;&nbsp;|&nbsp;&nbsp; [ 5 ] Cheat to Boss</div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="overlay hidden" style="background: rgba(0,0,0,1);">
+        <div class="menu-title" style="color: #F87171; text-shadow: 4px 4px 0 #7F1D1D, 0 8px 0 #000;">FATALITY</div>
+        <div style="font-size: 2rem; color: white; text-shadow: 2px 2px 0 #000; margin-bottom: 10px;">Berhenti di Level <span id="game-over-level">1-1</span></div>
+        <div style="font-size: 1.2rem; color: #FCA5A5; text-shadow: 1px 1px 0 #000; margin-bottom: 30px; text-align: center; max-width: 80%; font-style: italic;">TUBUHMU TERBELAH MENJADI DUA.</div>
+        <div class="btn-group">
+            <button class="btn" id="btn-restart-level" style="background: #F59E0B; border-color: #fff; box-shadow: 0 8px 0 #B45309; font-size: 1.2rem; padding: 15px 30px;">ULANG LEVEL INI</button>
+            <button class="btn" id="btn-restart-full" style="background: #EF4444; border-color: #fff; box-shadow: 0 8px 0 #7F1D1D; font-size: 1.2rem; padding: 15px 30px;">DARI AWAL</button>
+        </div>
+    </div>
+
+    <!-- Level Cleared Screen -->
+    <div id="game-win-screen" class="overlay hidden" style="background: rgba(0,0,0,0.6);">
+        <div class="menu-title" style="color: #FFCE00; text-shadow: 4px 4px 0 #D22824, -2px -2px 0 #D22824, 4px -2px 0 #D22824, -2px 4px 0 #D22824, 0 8px 0 #000;" id="win-title">LEVEL CLEARED!</div>
+        <div id="win-subtitle" style="font-size: 1.5rem; color: white; text-shadow: 2px 2px 0 #000; margin-bottom: 30px; letter-spacing: 2px;">Kerja Bagus!</div>
+        <div style="font-size: 2rem; color: white; text-shadow: 2px 2px 0 #000; margin-bottom: 40px; background: rgba(255,255,255,0.1); padding: 10px 30px; border-radius: 20px;">Score: <span id="final-score" style="color: #FFCE00;">0</span></div>
+        <div class="btn-group">
+            <button class="btn" id="btn-next-level">NEXT LEVEL</button>
+            <button class="btn hidden" id="btn-play-again" style="background: #3B82F6; box-shadow: 0 8px 0 #1E3A8A;">MAIN DARI AWAL</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    /** --- AUDIO --- */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, type, duration, vol = 0.1) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+
+    const soundMatiCustom = new Audio("ssstik.io_1777388408068.mp3"); 
+    const goreSound = new Audio("Gore Blood and Bones Sound Effects Pack.mp3"); 
+
+    const sfx = {
+        jump: () => { playTone(500, 'sine', 0.15, 0.1); playTone(800, 'sine', 0.2, 0.05); },
+        coin: () => { playTone(987.77, 'sine', 0.1, 0.1); playTone(1318.51, 'sine', 0.3, 0.1); },
+        stomp: () => { playTone(200, 'square', 0.1, 0.1); playTone(150, 'square', 0.15, 0.1); },
+        bump: () => { playTone(150, 'triangle', 0.1, 0.1); },
+        slash: () => { playTone(900, 'sawtooth', 0.05, 0.1); playTone(400, 'sawtooth', 0.1, 0.1); }, 
+        die: () => { 
+            soundMatiCustom.currentTime = 0;
+            soundMatiCustom.play().catch(err => { console.log("ERROR AUDIO:", err.message); });
+        },
+        win: () => { playTone(523, 'sine', 0.1); playTone(659, 'sine', 0.1); playTone(783, 'sine', 0.2); playTone(1046, 'sine', 0.4); },
+        finish: () => { 
+            setTimeout(() => playTone(523, 'square', 0.1), 0); setTimeout(() => playTone(659, 'square', 0.1), 150);
+            setTimeout(() => playTone(783, 'square', 0.1), 300); setTimeout(() => playTone(1046, 'square', 0.3), 450);
+        },
+        firework: () => { playTone(800, 'sawtooth', 0.1, 0.05); playTone(1200, 'sine', 0.3, 0.05); },
+        charge: () => { playTone(150, 'sawtooth', 0.4, 0.05); }, 
+        crumble: () => { playTone(100, 'sawtooth', 0.3, 0.1); playTone(80, 'square', 0.2, 0.1); }, 
+        bossRoar: () => { playTone(100, 'sawtooth', 2.0, 0.3); playTone(80, 'square', 2.0, 0.3); playTone(200, 'triangle', 2.0, 0.2); }, 
+        bossHit: () => { playTone(300, 'square', 0.1, 0.3); playTone(150, 'sawtooth', 0.3, 0.3); },
+        bossLaserCharge: () => { playTone(800, 'sine', 0.5, 0.1); playTone(1200, 'sine', 0.5, 0.05); },
+        bossLaserFire: () => { playTone(100, 'sawtooth', 0.8, 0.4); playTone(50, 'square', 0.8, 0.4); },
+        bossShieldHit: () => { playTone(900, 'triangle', 0.1, 0.3); playTone(1000, 'triangle', 0.2, 0.1); },
+        bossSlam: () => { playTone(100, 'sawtooth', 0.5, 0.3); playTone(50, 'square', 0.5, 0.3); },
+        bossSummon: () => { playTone(600, 'sine', 0.2, 0.1); playTone(800, 'sine', 0.3, 0.1); },
+        eerieAmbience: () => { playTone(60, 'sine', 6.0, 0.2); playTone(65, 'sine', 6.0, 0.1); },
+        glitch: () => { playTone(1200, 'sawtooth', 0.1, 0.2); playTone(300, 'square', 0.1, 0.3); },
+        whiteFlashSound: () => { playTone(1500, 'square', 0.5, 0.1); playTone(100, 'sawtooth', 2.0, 0.5); },
+        earthquake: () => { playTone(50, 'sawtooth', 3.0, 0.6); playTone(40, 'square', 3.0, 0.5); },
+        trueBossRoar: () => { playTone(40, 'sawtooth', 3.0, 0.8); playTone(80, 'square', 3.0, 0.5); playTone(150, 'triangle', 3.0, 0.4); },
+        wind: () => { playTone(150, 'sine', 0.8, 0.2); playTone(200, 'triangle', 0.8, 0.1); }
+    };
+
+    /** --- ASSETS GENERATOR --- */
+    const assets = {};
+    const palette = {
+        '.': null,        'R': '#E83000', 'B': '#0058F8',   'S': '#F8D870', 
+        'H': '#885000',   'K': '#000000', 'W': '#FFFFFF',   'G': '#00A800', 
+        'L': '#88F800',   'O': '#C84C0C', 'Y': '#F8B800',   'M': '#503000', 
+        'E': '#F8D870',   'D': '#000000', 'C': '#BCBCBC',   'Z': '#005800', 
+        'P': '#C800F8',   'I': '#00F8F8', 'A': '#222222',   'V': '#4A004A'  
+    };
+
+    function buildSprite(dataArray, scale = 2.5) {
+        const height = dataArray.length;
+        const width = dataArray[0].length;
+        const c = document.createElement('canvas');
+        c.width = width; c.height = height;
+        const ctx = c.getContext('2d');
+        for(let y = 0; y < height; y++) {
+            for(let x = 0; x < width; x++) {
+                const char = dataArray[y][x];
+                if (char !== '.' && palette[char]) {
+                    ctx.fillStyle = palette[char]; ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+        const scaled = document.createElement('canvas');
+        scaled.width = width * scale; scaled.height = height * scale;
+        const sCtx = scaled.getContext('2d');
+        sCtx.imageSmoothingEnabled = false; sCtx.drawImage(c, 0, 0, scaled.width, scaled.height);
+        return scaled;
+    }
+
+    function initAssets() {
+        assets.playerIdle = buildSprite(["....RRRRR.......","...RRRRRRRRR....","...HHHSSH.......","..HSHSSSHSHH....","..HSHSSSSSHH....","..HHSSSSSS......","....SSSSS.......","...RRRBRRR......","..RRRBRBRRR.....",".RRRRRBRRRRR....",".SSBRRYRRBSS....",".SSSBBBBBSS.....",".SSBBBBBBSS.....","...BB..BB.......","..HHH..HHH......",".HHHH..HHHH....."]);
+        assets.playerWalk1 = buildSprite(["....RRRRR.......","...RRRRRRRRR....","...HHHSSH.......","..HSHSSSHSHH....","..HSHSSSSSHH....","..HHSSSSSS......","....SSSSS.......","...RRRBRRR......","..RRRBRBRRR.....",".RRRRRBRRRRR....",".SSBRRYRRBSS....",".SSSBBBBBSS.....",".SSBBBBBBSS.....","...BBBBB........","..HHHHHHH.......",".HHHH..HHHH....."]);
+        assets.playerJump = buildSprite(["....RRRRR.......","...RRRRRRRRR....","...HHHSSH.......","..HSHSSSHSHH....","..HSHSSSSSHH....","..HHSSSSSS......","....SSSSS.......","...RRRBRRR......",".SSRRRBRBRRR....",".SSSRRRBRRRRR...","..SSBRRYRRBSS...","...SBBBBBBB.....","...BBBBBBBB.....","...BB....BB.....","..HHH....HHH....",".HHHH....HHHH..."]);
+        
+        assets.playerScream = buildSprite([
+            "....RRRRR.......",
+            "...RRRRRRRRR....",
+            "...HHHSSH.......",
+            "..HSHSKSHSHH....", 
+            "..HSHSSSSSHH....",
+            "..HHSKKKSS......", 
+            "..SSSKKKS.SS....", 
+            ".SSRRRBRRR.SS...",
+            ".SSRRBRBRRRSS...",
+            "..RRRRRBRRRRR...",
+            "...BRRYRRB......",
+            "...SBBBBBS......",
+            "...SBBBBBS......",
+            "...BB..BB.......",
+            "..HHH..HHH......",
+            ".HHHH..HHHH....."
+        ]);
+
+        assets.enemy1 = buildSprite(["................",".......HH.......","......HHHH......",".....HHHHHH.....","....HHHHHHHH....","...HKKHHHHKKH...","..HKWKHHHHKWKH..",".HKKWKHHHHKWKKH.",".HHKKHKHHKHKKHH.",".HHHHHKHHKHHHHH.",".HHHHKKKKKKHHHH.","..HHHHKKKKHHHH..","....SESSSSES....","...SSS....SSS...","..SSSS....SSSS..","..SSS......SSS.."]);
+        assets.enemy2 = buildSprite(["................",".......HH.......","......HHHH......",".....HHHHHH.....","....HHHHHHHH....","...HKKHHHHKKH...","..HKWKHHHHKWKH..",".HKKWKHHHHKWKKH.",".HHKKHKHHKHKKHH.",".HHHHHKHHKHHHHH.",".HHHHKKKKKKHHHH.","..HHHHKKKKHHHH..","...SESSSSES.....","..SSS....SSS....",".SSSS....SSSS...","..SSS......SSS.."]);
+        assets.enemyJumper1 = buildSprite(["................",".......BB.......","......BBBB......",".....BBBBBB.....","....BBBBBBBB....","...BIIBBBBIIB...","..BIWIBBBBBIWIB.",".BIIWIBBBBBIWIIB",".BBIIBIBBIIBIIBB",".BBBBBIBBIIBBBBB",".BBBBIIIIIIBBBBB","..BBBBIIIIBBBB..","....SESSSSES....","...SSS....SSS...","..SSSS....SSSS..","..SSS......SSS.."]);
+        assets.enemyJumper2 = buildSprite(["................",".......BB.......","......BBBB......",".....BBBBBB.....","....BBBBBBBB....","...BIIBBBBIIB...","..BIWIBBBBBIWIB.",".BIIWIBBBBBIWIIB",".BBIIBIBBIIBIIBB",".BBBBBIBBIIBBBBB",".BBBBIIIIIIBBBBB","..BBBBIIIIBBBB..","...SESSSSES.....","..SSS....SSS....",".SSSS....SSSS...","..SSS......SSS.."]);
+        assets.enemyDead = buildSprite(["................","................","................","................","................","................","................","................",".......HH.......","......HHHH......","....HHHHHHHH....","...HKKHHHHKKH...","..HKKHKHHKHKKH..",".HHKKHKHHKHKKHH.",".HHHHKKKKKKHHHH.","SSSSSSSSSSSSSSSS"]);
+
+        assets.bossEyeOpen1 = buildSprite([
+            "......A..........A......",".....AWA........AWA.....","....AWWA........AWWA....","...AWWWA...YY...AWWWA...",
+            "...AWWCA..YWWY..CAWWA...","..AWWWA..YWKKWY..AWWWA..",".AWWWCA..WKKKKW..CAWWWA.",".AWWWA...WKBBKW...AWWWA.",
+            "AWWWCA...WKKKKW...CAWWWA","AWWWA.....YWWY.....AWWWA","AWWCA......YY......CAWWA",".AWWA.A..........A.AWWA.",
+            ".AWA.AWA........AWA.AWA.","..A..AWWA......AWWA..A..","....AWWWA......AWWWA....","....AWWCA......CAWWA....",
+            "...AWWWA........AWWWA...","...CAWWA........CAWWA...","...AWWA..........AWWA...","..AWWCA..........CAWWA..",
+            "..AWWA............AWWA..",".AWWWA............AWWWA.",".AWA................AWA.","..A..................A.."
+        ]);
+        assets.bossEyeOpen2 = buildSprite([
+            "........................","........................","......A..........A......",".....AWA........AWA.....",
+            "....AWWA...YY...AWWA....","...AWWWA..YWWY..AWWWA...","...AWWCA..YWKKWY..CAWWA...","..AWWWA..WKKKKW..AWWWA..",
+            ".AWWWCA..WKBBKW..CAWWWA.",".AWWWA...WKKKKW...AWWWA.","AWWWCA....YWWY....CAWWWA","AWWWA......YY......AWWWA",
+            "AWWCA.A..........A.CAWWA",".AWWA.AWA........AWA.AWWA.",".AWA..AWWA......AWWA..AWA.","..A...AWWWA......AWWWA...A..",
+            ".....AWWCA......CAWWA.....","....AWWWA........AWWWA....","....CAWWA........CAWWA....","...AWWA..........AWWA...",
+            "...AWWCA..........CAWWA...","..AWWA............AWWA..","..AWA..............AWA..","...A................A..."
+        ]);
+        assets.bossEyeClosed = buildSprite([
+            "......A..........A......",".....AWA........AWA.....","....AWWA........AWWA....","...AWWWA...YY...AWWWA...",
+            "...AWWCA..YRRY..CAWWA...","..AWWWA..YRRRRY..AWWWA..",".AWWWCA..RRKKRR..CAWWWA.",".AWWWA...RRKKRR...AWWWA.",
+            "AWWWCA...YRRRRY...CAWWWA","AWWWA.....YRRY.....AWWWA","AWWCA......YY......CAWWA",".AWWA.A..........A.AWWA.",
+            ".AWA.AWA........AWA.AWA.","..A..AWWA......AWWA..A..","....AWWWA......AWWWA....","....AWWCA......CAWWA....",
+            "...AWWWA........AWWWA...","...CAWWA........CAWWA...","...AWWA..........AWWA...","..AWWCA..........CAWWA..",
+            "..AWWA............AWWA..",".AWWWA............AWWWA.",".AWA................AWA.","..A..................A.."
+        ]);
+
+        // TRUE FINAL BOSS: BIBLICALLY ACCURATE HD ANGEL (6 WINGS)
+        assets.trueBossEyeOpen = buildSprite([
+            ".........A..................A.........",
+            ".......AAWAA..............AAWAA.......",
+            "......AWWWWWA............AWWWWWA......",
+            ".....AWWWWWWWAA........AAWWWWWWWA.....",
+            "....AWWWWWWWWWWA......AWWWWWWWWWWA....",
+            "AA.AWWWWWWWWWWWWAA..AAWWWWWWWWWWWWA.AA",
+            "AAAWWWWWWWWWWWWWWW..WWWWWWWWWWWWWWWAAA",
+            ".AAWWWWWWWWWWWW........WWWWWWWWWWWWAA.",
+            "...AAWWWWWWWW...YYYYYY...WWWWWWWWAA...",
+            ".....AAWWWWW..YYWWWWWWYY..WWWWWAA.....",
+            "AA.....AAWW..YYWWKKKKWWYY..WWAA.....AA",
+            "AAAWW....AA..YYWKRRRRKWYY..AA....WWAAA",
+            ".AAWWWWW....YYWWKRRRRKWYY....WWWWWAA..",
+            "...AAWWWWWW..YYWWKKKKWWYY..WWWWWWAA...",
+            ".....AAWWWWWA..YYWWWWWWYY..AWWWWAA....",
+            ".......AAWWWWA...YYYYYY...AWWWAA......",
+            ".........AAWWWA..........AWWWAA.......",
+            "..........AAWWWA........AWWWAA........",
+            "...........AAWWWA......AWWWAA.........",
+            "............AAWWWA....AWWWAA..........",
+            ".............AAWWA....AWWAA...........",
+            "..............AAWA....AWAA............",
+            "...............AA......AA.............",
+            "......................................"
+        ], 6); 
+        
+        assets.trueBossEyeClosed = buildSprite([
+            ".........A..................A.........",
+            ".......AAWAA..............AAWAA.......",
+            "......AWWWWWA............AWWWWWA......",
+            ".....AWWWWWWWAA........AAWWWWWWWA.....",
+            "....AWWWWWWWWWWA......AWWWWWWWWWWA....",
+            "AA.AWWWWWWWWWWWWAA..AAWWWWWWWWWWWWA.AA",
+            "AAAWWWWWWWWWWWWWWW..WWWWWWWWWWWWWWWAAA",
+            ".AAWWWWWWWWWWWW........WWWWWWWWWWWWAA.",
+            "...AAWWWWWWWW...YYYYYY...WWWWWWWWAA...",
+            ".....AAWWWWW..YYWWWWWWYY..WWWWWAA.....",
+            "AA.....AAWW..YYWWWWWWWWYY..WWAA.....AA",
+            "AAAWW....AA..YYYYYYYYYYYY..AA....WWAAA",
+            ".AAWWWWW....YYKKKKKKKKKKYY....WWWWWAA..",
+            "...AAWWWWWW..YYYYYYYYYYYY..WWWWWWAA...",
+            ".....AAWWWWWA..YYWWWWWWYY..AWWWWAA....",
+            ".......AAWWWWA...YYYYYY...AWWWAA......",
+            ".........AAWWWA..........AWWWAA.......",
+            "..........AAWWWA........AWWWAA........",
+            "...........AAWWWA......AWWWAA.........",
+            "............AAWWWA....AWWWAA..........",
+            ".............AAWWA....AWWAA...........",
+            "..............AAWA....AWAA............",
+            "...............AA......AA.............",
+            "......................................"
+        ], 6);
+
+        // HD Vector Hand (Fleshy Demon Hand)
+        assets.bossHand = (function() {
+            const c = document.createElement('canvas');
+            c.width = 400; c.height = 500;
+            const ctx = c.getContext('2d');
+            ctx.translate(200, 100);
+            ctx.scale(2, 2); 
+
+            const skinColor = '#5c2222'; 
+            const darkShade = '#1a0505';
+            const veinColor = '#ff3333';
+            const boneColor = '#d9d0c1';
+
+            ctx.fillStyle = skinColor;
+            ctx.strokeStyle = darkShade;
+            ctx.lineWidth = 4;
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(-50, -50); 
+            ctx.quadraticCurveTo(-75, 20, -60, 70); 
+            ctx.quadraticCurveTo(0, 90, 60, 70); 
+            ctx.quadraticCurveTo(75, 20, 50, -50); 
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            const drawF = (x, y, cx1, cy1, cx2, cy2, ex, ey, w, t=false) => {
+                ctx.beginPath();
+                ctx.moveTo(x-w, y);
+                ctx.bezierCurveTo(cx1-w, cy1, cx2-w/2, cy2, ex, ey);
+                ctx.bezierCurveTo(cx2+w/2, cy2, cx1+w, cy1, x+w, y);
+                ctx.fill(); ctx.stroke();
+                
+                ctx.beginPath(); ctx.arc(x, y+10, w*0.6, 0, Math.PI); ctx.stroke();
+                ctx.beginPath(); ctx.arc(ex-(ex-x)*0.3, ey-(ey-y)*0.3, w*0.5, 0, Math.PI); ctx.stroke();
+
+                ctx.fillStyle = boneColor;
+                ctx.beginPath();
+                ctx.moveTo(ex-w/2+1, ey-2);
+                ctx.lineTo(ex, ey+(t?25:40)); 
+                ctx.lineTo(ex+w/2-1, ey-2);
+                ctx.quadraticCurveTo(ex, ey+8, ex-w/2+1, ey-2);
+                ctx.fill(); ctx.stroke();
+                
+                ctx.fillStyle = '#8B0000';
+                ctx.beginPath();
+                ctx.moveTo(ex-2, ey+(t?15:25));
+                ctx.lineTo(ex, ey+(t?25:40));
+                ctx.lineTo(ex+2, ey+(t?15:25));
+                ctx.fill();
+                ctx.fillStyle = skinColor;
+            };
+
+            drawF(-50, 50, -75, 110, -85, 150, -80, 180, 11); 
+            drawF(-20, 68, -35, 140, -40, 180, -35, 210, 13); 
+            drawF( 50, 58,  70, 130,  65, 170,  60, 200, 13); 
+            drawF( 15, 72,  15, 150,  10, 190,  12, 230, 15); 
+            drawF( 65, 20, 110,  60, 120,  90, 110, 120, 16, true); 
+
+            ctx.strokeStyle = veinColor; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6;
+            ctx.beginPath(); ctx.moveTo(-30, -40); ctx.quadraticCurveTo(-10, 0, -20, 50); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -40); ctx.quadraticCurveTo(25, 20, 15, 60); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(30, -40); ctx.quadraticCurveTo(45, -10, 60, 15); ctx.stroke();
+            ctx.globalAlpha = 1.0;
+
+            return c;
+        })();
+
+        assets.bgGiantEye = assets.trueBossEyeOpen;
+
+        assets.deadTree = buildSprite(["................KK................","...............KKK................","........K......KKK.......K........",".......KKK....KKKKK.....KK........","........KKK...KKKKK....KKK........",".........KKK..KKKKK...KKK.........","..........KKK.KKKKK..KKK..........","...........KKKKKKKKKKKK...........",".............KKKKKKKK.............",".............KKKKKKK..............",".............KKKKKKK..............",".............KKKKKKK..............",".............KKKKKKK..............",".............KKKKKKK..............","............KKKKKKKKK.............","...........KKKKKKKKKKK............"], 4);
+        assets.spike = buildSprite(["................","................","................","................","................",".......C........","......CCC.......","......CWC.......",".....CCCCC......","....CCWCCC......","...CCCCCCC......","...CCWCCCC......","..CCCCCCCCC.....",".CCCCWCCCCCC....","CCCCCCCCCCCCCCC.","CCCCCCCCCCCCCCCC"]);
+        assets.fallingBlock = buildSprite(["OOOORRRROOOORRRR","OOOORRRROOOORRRR","RRRROOOORRRROOOO","RRRROOOORRRROOOO","OOOORRRROOOORRRR","OOOORRRROOOORRRR","RRRROOOORRRROOOO","RRRROOOORRRROOOO","OOOORRRROOOORRRR","OOOORRRROOOORRRR","RRRROOOORRRROOOO","RRRROOOORRRROOOO","OOOORRRROOOORRRR","OOOORRRROOOORRRR","RRRROOOORRRROOOO","RRRROOOORRRROOOO"]);
+        assets.cloud = buildSprite(["............WWWWWW..............","..........WWWWWWWWWW............","........WWWWWWWWWWWWWW..........","......WWWWWWWWWWWWWWWWWW........","....WWWWWWWWWWWWWWWWWWWWWW......","...WWWWWWWWWWWWWWWWWWWWWWWW.....","..WWWWWWWWWWWWWWWWWWWWWWWWWW....",".WWWWWWWWWWWWWWWWWWWWWWWWWWWW...","WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW..","WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW..","CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC..","................................"], 3);
+        assets.bush = buildSprite(["............LLLLLL..............","..........LLLLLLLLLL............","........LLLLLLLLLLLLLL..........","......LLLLLLLLLLLLLLLLLL........","....LLLLLLLLLLLLLLLLLLLLLL......","...LLLLLLLLLLLLLLLLLLLLLLLL.....","..LLLLLLLLLLLLLLLLLLLLLLLLLL....",".LLLLLLLLLLLLLLLLLLLLLLLLLLLL...","LLLLLLLLLLLLLLLLLLLLLLLLLLLLLL..","GGGGGGGGGGGGGGGGGGGGGGGGGGGGGG..","ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ..","................................"], 3);
+        assets.hill = buildSprite(["...............L................","..............LLL...............",".............LLLLL..............","............LLLLLLL.............","...........LLLLLLLLL............","..........LLLLLLLLLLL...........",".........LLLLLLLLLLLLL..........","........LLLLLLLLLLLLLLL.........",".......LLLLLLLLLLLLLLLLL........","......LLLLLLLLLLLLLLLLLLL.......",".....LLLLGLLLLLLLLLLGLLLLL......","....LLLLLGGLLLLLLLLLGGLLLLL.....","...LLLLLLGGGLLLLLLLGGGLLLLLL....","..LLLLLLLGGGGLLLLLGGGGLLLLLLL...",".LLLLLLLLGGGGGLLLGGGGGLLLLLLLL..","GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG","ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"], 4);
+        assets.ground = buildSprite(["LLLLLLLLLLLLLLLL","GGGGGGGGGGGGGGGG","OOMOOOOOOOOOOMOO","OMMMOOOOOOOOMMMO","OOMOOOOOOOOOOOMO","OOOOOOOOMOOOOOOO","OOOOOOOMMMOOOOOO","OMOOOOOOMOOOOOOO","MMMOOOOOOOOOOOMO","OMOOOOOOOOOOOMMM","OOOOOOOOOOOOOOMO","OOOOMOOOOOOOOOOO","OOOMMMOOOOOOOOOO","OOOOMOOOOOMOOOOO","OOOOOOOOOMMMOOOO","OOOOOOOOOOMOOOOO"]);
+        assets.brick = buildSprite(["OOOOOOOOOOOOOOKK","OOOOOOOOOOOOOOKK","OOOOOOOOOOOOOOKK","OOOOOOOOOOOOOOKK","KKKKKKKKKKKKKKKK","KKKKKKKKKKKKKKKK","OOOOOOKKOOOOOOOO","OOOOOOKKOOOOOOOO","OOOOOOKKOOOOOOOO","OOOOOOKKOOOOOOOO","KKKKKKKKKKKKKKKK","KKKKKKKKKKKKKKKK","OOOOOOOOOOOOOOKK","OOOOOOOOOOOOOOKK","OOOOOOOOOOOOOOKK","OOOOOOOOOOOOOOKK"]);
+        assets.question = buildSprite(["OYYYYYYYYYYYYYYK","YYYYYYYYYYYYYYYK","YYKKYYYYYYYYKKYK","YYKKYYYYYYYYKKYK","YYYYYYKKKKYYYYYK","YYYYYKKYKKYKYYYK","YYYYYKKYKKYKYYYK","YYYYYYYYKKYKYYYK","YYYYYYYKKYKYYYYK","YYYYYYYKKYKYYYYK","YYYYYYYYYYYYYYYK","YYYYYYYKKYKYYYYK","YYYYYYYKKYKYYYYK","YYKKYYYYYYYYKKYK","YYKKYYYYYYYYKKYK","KKKKKKKKKKKKKKKK"]);
+        assets.emptyBlock = buildSprite(["EMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMDDMMMMMMMMDDMD","MMDDMMMMMMMMDDMD","MMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMMMMMMMMMMMMMMD","MMDDMMMMMMMMDDMD","MMDDMMMMMMMMDDMD","DDDDDDDDDDDDDDDD"]);
+    }
+    initAssets();
+
+    /** --- SETUP CANVAS --- */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const logicalWidth = 1000, logicalHeight = 562; 
+    let scale = 1;
+
+    function resizeCanvas() {
+        const container = document.getElementById('game-container');
+        canvas.width = container.clientWidth; canvas.height = container.clientHeight;
+        scale = Math.max(canvas.width / logicalWidth, canvas.height / logicalHeight);
+    }
+    window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+    const keys = { left: false, right: false, up: false };
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+        if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+            if(gameState === 'PLAYING' || gameState === 'TRUE_BOSS_FIGHT') player.jump();
+            keys.up = true;
+        }
+        if (e.code === 'Digit5') { currentLevelIndex = 0; initGame('NEXT'); } 
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+        if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = false;
+    });
+
+    const gameLevels = [
+        [
+            "................................................................................",
+            "................................................................................",
+            "................................................................................",
+            "................................................................................",
+            "................................................................................",
+            "................................................................................",
+            "...................................................X............................",
+            "BB............................................................................BB",
+            "BB............................................................................BB",
+            "BB............................................................................BB",
+            "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+            "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+            "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        ]
+    ];
+
+    let globalTime = 0; 
+    let lastTime = 0, gameState = 'START'; 
+    let score = 0, coinsCount = 0, timeLeft = 300, timeTimer = 0;
+    let checkpointScore = 0, checkpointCoins = 0;
+    let currentLevelIndex = 0; 
+
+    // 🔥 VARIABEL FATALITY CUTSCENE 
+    let hitStopTimer = 0; 
+    let deathPhase = '', deathTimer = 0; 
+    let fadeOpacity = 0, shakeTime = 0, shakeMag = 0;
+    let deathBloodAlpha = 0, bloodPuddle = [], guts = [];
+    let dHand1 = {x:0, y:0, tx:0, ty:0}; 
+    let dHand2 = {x:0, y:0, tx:0, ty:0}; 
+    let dUpperY = 0, dLowerY = 0, dUpperVy = 0, dLowerVy = 0;
+    
+    // PROCEDURAL LIMBS STATE
+    let p_Limbs = { LArm: true, RArm: true, LLeg: true, RLeg: true, UpperTorso: true, LowerTorso: true };
+    let flyingLimbs = [];
+
+    let introTimer = 0; let bossIntroTimer = 0; let isBossLevel = false;
+    let storyTimer = 0; let whiteFlash = 0; let hitFlashTimer = 0; 
+    let checkpointTrueBoss = false; 
+
+    const gravity = 2500, tileSize = 40;
+
+    class Camera {
+        constructor() { this.x = 0; this.y = 0; this.zoom = 1; this.targetZoom = 1; this.manualY = null; }
+        update(dt) {
+            this.zoom += (this.targetZoom - this.zoom) * 3 * dt;
+
+            if (gameState === 'BOSS_INTRO' && boss) {
+                let targetX = boss.x - logicalWidth / 2; this.x += (targetX - this.x) * 3 * dt;
+                let targetY = Math.min(boss.y - logicalHeight / 1.5, 0); this.y += (targetY - this.y) * 3 * dt;
+                return;
+            }
+            if (gameState === 'STORY_OUTRO_FAKE' || gameState === 'TRUE_BOSS_INTRO') return; 
+
+            let targetX = player.x - logicalWidth / 3;
+            if (targetX < 0) targetX = 0;
+            let smoothSpeed = gameState === 'INTRO' || gameState === 'STORY_INTRO' ? 2 : 5;
+            this.x += (targetX - this.x) * smoothSpeed * dt;
+            
+            let targetY = this.manualY !== null ? this.manualY : Math.min(player.y - logicalHeight / 1.5, 0);
+            this.y += (targetY - this.y) * smoothSpeed * dt;
+        }
+    }
+
+    class Background {
+        draw(ctx, camX) {
+            const groundY = 10 * 40; const cloudDrift = globalTime * 15; 
+            
+            if (isBossLevel || gameState === 'TRUE_BOSS_FIGHT' || gameState === 'TRUE_BOSS_INTRO') {
+                for(let i=0; i<15; i++) {
+                    let offset = i * 600; ctx.drawImage(assets.deadTree, offset - camX * 0.1, groundY - assets.deadTree.height + 40);
+                }
+
+                let isRage = (boss && boss.phase === 3) || (trueBoss && trueBoss.phase === 3);
+                ctx.fillStyle = isRage && gameState !== 'STORY_OUTRO_FAKE' ? 'rgba(80, 0, 0, 0.4)' : 'rgba(20, 20, 30, 0.4)';
+                ctx.fillRect(0, logicalHeight - 200, logicalWidth, 200);
+
+                let currentFogAlpha = 0.5;
+                if (gameState === 'STORY_OUTRO_FAKE') currentFogAlpha = Math.max(0, 0.5 - (storyTimer / 5)); 
+                else if (gameState === 'TRUE_BOSS_INTRO' || gameState === 'TRUE_BOSS_FIGHT') currentFogAlpha = 0.7; 
+
+                ctx.globalAlpha = currentFogAlpha;
+                for(let i=0; i<5; i++) {
+                    let fogX = (i * 400 - (cloudDrift * 3) % 2000) - camX * 0.2;
+                    let fogY = logicalHeight - 250 + Math.sin(globalTime * 2 + i) * 30;
+                    ctx.beginPath();
+                    let gradient = ctx.createRadialGradient(fogX+200, fogY+50, 10, fogX+200, fogY+50, 250);
+                    gradient.addColorStop(0, isRage && gameState !== 'STORY_OUTRO_FAKE' ? 'rgba(255, 50, 50, 0.3)' : 'rgba(200, 200, 255, 0.3)');
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient; ctx.fillRect(fogX-100, fogY-100, 600, 350);
+                }
+                ctx.globalAlpha = 1.0;
+            } else {
+                for(let i=0; i<10; i++) {
+                    let offset = i * 1000; 
+                    ctx.drawImage(assets.hill, offset + 100 - camX * 0.1, groundY - assets.hill.height);
+                    ctx.drawImage(assets.hill, offset + 600 - camX * 0.1, groundY - assets.hill.height);
+                    ctx.drawImage(assets.bush, offset + 350 - camX * 0.15, groundY - assets.bush.height);
+                    ctx.drawImage(assets.bush, offset + 900 - camX * 0.15, groundY - assets.bush.height);
+                    ctx.drawImage(assets.cloud, offset + 150 - camX * 0.05 - (cloudDrift % 1000), 80);
+                    ctx.drawImage(assets.cloud, offset + 450 - camX * 0.05 - (cloudDrift % 1000), 160);
+                    ctx.drawImage(assets.cloud, offset + 850 - camX * 0.05 - (cloudDrift % 1000), 100);
+                }
+            }
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color, speedScale = 1.0, isGravity = false) {
+            this.x = x; this.y = y; this.vx = (Math.random() - 0.5) * 400 * speedScale; this.vy = (Math.random() - 0.5) * 400 * speedScale;
+            this.life = 1.0; this.color = color; this.size = Math.random() * 8 + 6; this.isGravity = isGravity;
+        }
+        update(dt) {
+            if (this.isGravity) this.vy += gravity * 0.5 * dt; 
+            this.x += this.vx * dt; this.y += this.vy * dt; this.life -= dt * 2.0;
+        }
+        draw(ctx) {
+            if (this.life <= 0) return;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = Math.max(0, this.life); 
+            
+            let grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+            grad.addColorStop(0, this.color);
+            grad.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    class FloatingText {
+        constructor(text, x, y, color = '#FFFFFF') { this.text = text; this.x = x; this.y = y; this.vy = -150; this.life = 1.5; this.color = color; }
+        update(dt) { this.y += this.vy * dt; this.life -= dt; }
+        draw(ctx) {
+            if(this.life <= 0) return;
+            ctx.save(); ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = this.color;
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.font = '900 24px Nunito';
+            ctx.strokeText(this.text, this.x, this.y); ctx.fillText(this.text, this.x, this.y); ctx.restore();
+        }
+    }
+
+    class FloatingCoin {
+        constructor(x, y) { this.x = x; this.y = y; this.vy = -400; this.life = 1.0; }
+        update(dt) { this.vy += gravity * dt; this.y += this.vy * dt; this.life -= dt * 2; }
+        draw(ctx) {
+            if (this.life <= 0) return;
+            ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = '#F8B800'; ctx.shadowBlur = 15; ctx.shadowColor = '#F8B800';
+            ctx.beginPath(); ctx.arc(this.x + 20, this.y + 20, 15, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#C84C0C'; ctx.lineWidth = 3; ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1.0;
+        }
+    }
+
+    class Block {
+        constructor(x, y, type, w = tileSize, h = tileSize) {
+            this.originalX = x * tileSize; this.x = this.originalX; this.y = y * tileSize;
+            this.w = w; this.h = h; this.type = type; this.originalY = this.y;
+            this.vy = 0; this.bumpTimer = 0; this.isEndPipe = false; this.isFalling = false; this.fallTimer = undefined;
+        }
+        bump() {
+            if (['empty', 'pipe', 'spike', 'falling'].includes(this.type)) { if (this.type === 'pipe' || this.type === 'empty') sfx.bump(); return; }
+            this.vy = -150; this.bumpTimer = 0.15;
+            
+            for(let i=0; i<8; i++) effects.push(new Particle(this.x + 20, this.y, '#E83000', 1.0, true)); 
+            
+            if (this.type === 'question') {
+                sfx.coin(); score += 100; coinsCount++; updateHUD(); effects.push(new FloatingCoin(this.x, this.y - tileSize));
+                texts.push(new FloatingText("+100", this.x, this.y - tileSize - 20, '#F8B800')); this.type = 'empty';
+            } else if (this.type === 'brick') sfx.bump();
+        }
+        triggerFall() { if (this.type === 'falling' && !this.isFalling && this.fallTimer === undefined) { this.fallTimer = 0.5; sfx.crumble(); } }
+        update(dt) {
+            if (this.bumpTimer > 0) {
+                this.bumpTimer -= dt; this.y += this.vy * dt; this.vy += gravity * 2 * dt;
+                if (this.y > this.originalY) { this.y = this.originalY; this.bumpTimer = 0; }
+            }
+            if (this.type === 'falling') {
+                if (this.fallTimer !== undefined && !this.isFalling) {
+                    this.fallTimer -= dt; this.x = this.originalX + (Math.random() - 0.5) * 6; 
+                    if (this.fallTimer <= 0) { this.isFalling = true; this.x = this.originalX; }
+                }
+                if (this.isFalling) { this.vy += gravity * 1.5 * dt; this.y += this.vy * dt; }
+            }
+        }
+        draw(ctx) {
+            if (this.type === 'ground') ctx.drawImage(assets.ground, this.x, this.y);
+            else if (this.type === 'brick') ctx.drawImage(assets.brick, this.x, this.y);
+            else if (this.type === 'question') ctx.drawImage(assets.question, this.x, this.y);
+            else if (this.type === 'empty') ctx.drawImage(assets.emptyBlock, this.x, this.y);
+            else if (this.type === 'spike') ctx.drawImage(assets.spike, this.x, this.y);
+            else if (this.type === 'falling') ctx.drawImage(assets.fallingBlock, this.x, this.y);
+            else if (this.type === 'pipe') {
+                ctx.fillStyle = '#000'; ctx.fillRect(this.x, this.y, 80, this.h);
+                ctx.fillStyle = '#88F800'; ctx.fillRect(this.x+2, this.y+2, 76, this.h-2);
+                ctx.fillStyle = '#00A800'; ctx.fillRect(this.x+8, this.y+2, 60, this.h-2);
+                ctx.fillStyle = '#005800'; ctx.fillRect(this.x+52, this.y+2, 16, this.h-2);
+                ctx.fillStyle = '#88F800'; ctx.fillRect(this.x+14, this.y+2, 6, this.h-2);
+                ctx.fillStyle = '#000'; ctx.fillRect(this.x-2, this.y, 84, 30);
+                ctx.fillStyle = '#88F800'; ctx.fillRect(this.x, this.y+2, 80, 26);
+                ctx.fillStyle = '#00A800'; ctx.fillRect(this.x+6, this.y+2, 64, 26);
+                ctx.fillStyle = '#005800'; ctx.fillRect(this.x+54, this.y+2, 16, 26);
+                ctx.fillStyle = '#88F800'; ctx.fillRect(this.x+12, this.y+2, 6, 26);
+                if(this.isEndPipe) { ctx.fillStyle = '#W'; ctx.font = '20px Nunito'; ctx.fillText("FINISH", this.x+10, this.y-10); }
+            }
+        }
+    }
+
+    class Enemy {
+        constructor(x, y, enemyType = 'dash') {
+            this.x = x * tileSize; this.y = y * tileSize; this.w = 32; this.h = 32;
+            this.vx = -80; this.vy = 0; this.dead = false; this.deadTimer = 0; this.animTimer = 0;
+            this.enemyType = enemyType; this.state = 'PATROL'; this.stateTimer = 0;
+            this.detectRange = 250; this.baseSpeed = 80; this.dashSpeed = 350; this.facingRight = false;
+            if (this.enemyType === 'jump') { this.stateTimer = 1.0 + Math.random(); this.baseSpeed = 50; }
+        }
+        checkCliff(blocks) {
+            let checkX = this.facingRight ? this.x + this.w + 10 : this.x - 10; let checkY = this.y + this.h + 5; 
+            for (let b of blocks) {
+                if (b.type === 'spike' || (b.type === 'falling' && b.isFalling)) continue;
+                if (checkX >= b.x && checkX <= b.x + b.w && checkY >= b.y && checkY <= b.y + b.h) return false; 
+            }
+            return true; 
+        }
+        update(dt, blocks, playerObj) {
+            if (this.dead) { this.deadTimer -= dt; return; }
+            this.animTimer += dt * 5; this.vy += gravity * dt;
+            if (gameState === 'PLAYING' || gameState === 'TRUE_BOSS_FIGHT') {
+                let distX = playerObj.x - this.x; let distY = Math.abs(playerObj.y - this.y);
+                if (this.enemyType === 'jump') {
+                    if (this.state === 'PATROL') {
+                        if (this.vx === 0) this.vx = this.facingRight ? this.baseSpeed : -this.baseSpeed;
+                        this.stateTimer -= dt;
+                        if (this.vy === 0 && this.checkCliff(blocks)) { this.vx *= -1; this.facingRight = this.vx > 0; this.x += this.vx * dt * 3; }
+                        if (this.stateTimer <= 0 && this.vy === 0) {
+                            this.vy = -850; this.stateTimer = 2.0 + Math.random() * 1.5; sfx.jump();
+                            if (Math.abs(distX) < 350) { this.vx = distX > 0 ? 150 : -150; this.facingRight = distX > 0; } 
+                            else this.vx = this.facingRight ? 100 : -100;
+                        }
+                    }
+                } else {
+                    if (this.state === 'PATROL') {
+                        if (this.vx === 0) this.vx = this.facingRight ? this.baseSpeed : -this.baseSpeed;
+                        if (this.vy === 0 && this.checkCliff(blocks)) { this.vx *= -1; this.facingRight = this.vx > 0; this.x += this.vx * dt * 3; }
+                        if (Math.abs(distX) < this.detectRange && distY < 50) { this.state = 'ANTICIPATE'; this.stateTimer = 0.4; this.vx = 0; sfx.charge(); }
+                    } else if (this.state === 'ANTICIPATE') {
+                        this.stateTimer -= dt; this.facingRight = distX > 0; 
+                        if (this.stateTimer <= 0) { this.state = 'DASH'; this.stateTimer = 0.6; this.vx = this.facingRight ? this.dashSpeed : -this.dashSpeed; sfx.jump(); }
+                    } else if (this.state === 'DASH') {
+                        this.stateTimer -= dt; if (Math.random() < 0.3) effects.push(new Particle(this.x + 16, this.y + 32, '#FFFFFF', 0.5));
+                        if (this.stateTimer <= 0) { this.state = 'COOLDOWN'; this.stateTimer = 1.0; this.vx = 0; }
+                    } else if (this.state === 'COOLDOWN') {
+                        this.stateTimer -= dt; if (this.stateTimer <= 0) { this.state = 'PATROL'; this.vx = this.facingRight ? this.baseSpeed : -this.baseSpeed; }
+                    }
+                }
+            }
+            this.x += this.vx * dt; this.handleCollisions(blocks, 'x');
+            this.y += this.vy * dt; let wasInAir = this.vy > gravity * dt;
+            this.handleCollisions(blocks, 'y');
+            if (this.enemyType === 'jump' && wasInAir && this.vy === 0) this.vx = this.facingRight ? this.baseSpeed : -this.baseSpeed;
+            if (this.state === 'PATROL' && this.vx !== 0) this.facingRight = this.vx > 0;
+            else if (this.state === 'DASH' && this.vx === 0) { this.state = 'COOLDOWN'; this.stateTimer = 0.5; }
+            if (this.y > logicalHeight + 200) this.dead = true;
+        }
+        handleCollisions(blocks, axis) {
+            for (let b of blocks) {
+                if (b.type === 'spike') continue;
+                if (axis === 'x') {
+                    if (this.x < b.x + b.w && this.x + this.w > b.x && this.y + 2 < b.y + b.h && this.y + this.h - 2 > b.y) {
+                        this.x = this.vx > 0 ? b.x - this.w : b.x + b.w; this.vx *= -1; 
+                    }
+                } else {
+                    if (this.x + 2 < b.x + b.w && this.x + this.w - 2 > b.x && this.y < b.y + b.h && this.y + this.h > b.y) {
+                        if (this.vy > 0) { this.y = b.y - this.h; this.vy = 0; }
+                    }
+                }
+            }
+        }
+        draw(ctx) {
+            if (this.dead) { if (this.deadTimer > 0) ctx.drawImage(assets.enemyDead, this.x, this.y + 16); return; }
+            ctx.save();
+            let drawX = this.x; let drawY = this.y;
+            if (this.state === 'ANTICIPATE') { drawX += (Math.random() - 0.5) * 4; drawY += (Math.random() - 0.5) * 4; } 
+            else if (this.state === 'PATROL' && this.vy === 0) drawY += Math.sin(globalTime * 15) * 2; 
+            ctx.translate(drawX + this.w/2, drawY);
+            if (this.facingRight) ctx.scale(-1, 1);
+            let frame = Math.floor(this.animTimer) % 2 === 0 ? (this.enemyType === 'jump' ? assets.enemyJumper1 : assets.enemy1) : (this.enemyType === 'jump' ? assets.enemyJumper2 : assets.enemy2);
+            ctx.drawImage(frame, -16, 0); 
+            if (this.state === 'ANTICIPATE') { ctx.fillStyle = '#E83000'; ctx.font = '900 20px Nunito'; ctx.fillText("!", -5, -10); }
+            ctx.restore();
+        }
+    }
+
+    class Laser {
+        constructor(x, y, target, type = 'LOCK_ON') {
+            this.x = x; this.y = y; this.type = type; this.state = 'CHARGE'; 
+            this.timer = type === 'SPIN' ? 0.2 : 1.2; 
+            this.length = 2000; this.active = true; this.sweepSpeed = 0; this.isGodLaser = false; 
+
+            if (type === 'LOCK_ON') { this.targetPlayer = target; this.angle = 0; } 
+            else { this.angle = target; }
+        }
+        update(dt, playerObj) {
+            if (!this.active) return;
+            this.timer -= dt;
+            
+            if (this.state === 'CHARGE') {
+                if (this.type === 'LOCK_ON' && this.timer > 0.4) {
+                    let px = this.targetPlayer.x + this.targetPlayer.w/2; let py = this.targetPlayer.y + this.targetPlayer.h/2;
+                    this.angle = Math.atan2(py - this.y, px - this.x);
+                }
+
+                if (this.timer <= 0) {
+                    this.state = 'FIRE'; this.timer = this.type === 'SPIN' ? 3.0 : 0.6; 
+                    sfx.bossLaserFire(); shakeTime = this.type === 'SPIN' ? 3.0 : 0.4; shakeMag = 8;
+                    if(this.isGodLaser) { whiteFlash = 0.3; shakeMag = 15; }
+                }
+            } else if (this.state === 'FIRE') {
+                if (this.type === 'SWEEP') this.angle += this.sweepSpeed * dt;
+                else if (this.type === 'SPIN') this.angle += 0.9 * dt; 
+
+                if (this.timer <= 0) { this.active = false; }
+
+                let px = playerObj.x + playerObj.w/2; let py = playerObj.y + playerObj.h/2;
+                let diff = Math.atan2(py - this.y, px - this.x) - this.angle;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                let dist = Math.hypot(px - this.x, py - this.y);
+                let perpDist = Math.abs(Math.sin(diff) * dist);
+                let hitWidth = this.isGodLaser ? 30 : 20; 
+                if (perpDist < hitWidth && Math.abs(diff) < Math.PI/2) triggerDeathSequence();
+            }
+        }
+        draw(ctx) {
+            if (!this.active) return;
+            ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+            if (this.state === 'CHARGE') {
+                let alpha = this.timer < 0.4 ? (Math.floor(globalTime * 30) % 2 === 0 ? 0.9 : 0.2) : 0.6;
+                ctx.shadowBlur = 20; ctx.shadowColor = '#FF0000';
+                ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`; 
+                ctx.fillRect(0, -3, this.length, 6); 
+                ctx.beginPath(); ctx.arc(0, 0, 15 + Math.random()*10, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+            } else if (this.state === 'FIRE') {
+                let pulse = Math.sin(globalTime * 50) * 5;
+                let beamW = (this.isGodLaser ? 50 : 30) + pulse; 
+                let innerW = (this.isGodLaser ? 20 : 10) + pulse;
+                
+                ctx.shadowBlur = 30; ctx.shadowColor = '#FF0000';
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; ctx.fillRect(0, -beamW, this.length, beamW * 2);
+                
+                ctx.shadowBlur = 10; ctx.shadowColor = '#FF5555';
+                ctx.fillStyle = '#FF0000'; ctx.fillRect(0, -beamW/2, this.length, beamW);
+                
+                ctx.shadowBlur = 5; ctx.shadowColor = '#FFFFFF';
+                ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, -innerW/2, this.length, innerW);
+                ctx.shadowBlur = 0;
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath(); ctx.arc(0, 0, beamW, 0, Math.PI*2); ctx.fill();
+
+                if (Math.random() < 0.4) {
+                    effects.push(new Particle(this.x + Math.random() * 800, this.y + (Math.random() - 0.5) * beamW, '#FFF', 1.5, false));
+                }
+            }
+            ctx.restore();
+        }
+    }
+
+    class Boss {
+        constructor(x, y) {
+            this.x = x * tileSize; this.y = y * tileSize; this.w = 96; this.h = 96;
+            this.vx = 0; this.vy = 0; this.hp = 3; this.phase = 1;
+            this.state = 'IDLE'; this.stateTimer = 1.5; this.facingRight = false; this.animTimer = 0;
+            this.originalX = this.x; this.invulnerable = false; 
+            this.lasers = []; this.trail = []; 
+        }
+        update(dt, blocks, playerObj, enemiesArr) {
+            if (['BOSS_INTRO','INTRO','STORY_INTRO','STORY_OUTRO_FAKE','TRUE_BOSS_INTRO','TRUE_BOSS_FIGHT'].includes(gameState)) return;
+            if (this.state === 'DYING') {
+                this.stateTimer += dt;
+                this.x = this.originalX + (Math.random() - 0.5) * 20; this.y += (Math.random() - 0.5) * 20;
+                if (Math.random() < 0.2) { effects.push(new Particle(this.x + Math.random() * this.w, this.y + Math.random() * this.h, '#FF0000', 3, false)); sfx.bump(); }
+                if (this.stateTimer > 2.5 && this.stateTimer < 2.6) {
+                    for(let i=0; i<100; i++) effects.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#E83000', 5, true));
+                    sfx.firework(); this.y = 9999; triggerFakeEndingSequence(); 
+                }
+                return;
+            }
+
+            this.animTimer += dt * (this.phase === 3 ? 8 : 4);
+            
+            if (globalTime % 0.1 < 0.05 && this.state !== 'DYING') {
+                this.trail.push({x: this.x, y: this.y, timer: 0.5});
+            }
+            (this.trail || []).forEach((t, i) => { t.timer -= dt; if(t.timer<=0) this.trail.splice(i,1); });
+            for (let i = (this.lasers || []).length - 1; i >= 0; i--) { this.lasers[i].update(dt, playerObj); if (!this.lasers[i].active) this.lasers.splice(i, 1); }
+
+            if (this.state === 'COOLDOWN' || this.state === 'HURT') this.vy += gravity * dt;
+            else if (this.state !== 'SLAM_DOWN') this.vy = 0; 
+
+            if (gameState === 'PLAYING') {
+                let cx = this.x + this.w/2; let cy = this.y + this.h/2;
+                let px = playerObj.x + playerObj.w/2; let py = playerObj.y + playerObj.h/2;
+                let distX = px - cx; 
+                
+                this.invulnerable = ['EYE_SHIELD', 'FLY_UP', 'FLY_HOVER', 'SLAM_DOWN', 'ANTICIPATE_DASH', 'DASH', 'SUMMON', 'LASER_LOCK', 'LASER_SWEEP', 'LASER_SPIN'].includes(this.state);
+
+                switch(this.state) {
+                    case 'IDLE':
+                        this.vx = 0; this.stateTimer -= dt; this.facingRight = distX > 0;
+                        if (this.phase === 3) this.state = 'EYE_SHIELD'; 
+                        if (this.stateTimer <= 0) this.pickNextAttack(playerObj);
+                        break;
+                    case 'EYE_SHIELD': 
+                        this.vx = 0; this.stateTimer -= dt; this.facingRight = distX > 0;
+                        if (this.stateTimer <= 0) this.pickNextAttack(playerObj);
+                        break;
+                    case 'ANTICIPATE_DASH':
+                        this.stateTimer -= dt; this.facingRight = distX > 0;
+                        if (this.stateTimer <= 0) { this.state = 'DASH'; this.stateTimer = 0.8; this.vx = (this.facingRight ? 1 : -1) * (this.phase === 3 ? 550 : 350); sfx.jump(); }
+                        break;
+                    case 'DASH':
+                        this.stateTimer -= dt; if (Math.random() < 0.5) effects.push(new Particle(this.x + this.w/2, this.y + this.h, '#FFFFFF', 1.0));
+                        if (this.stateTimer <= 0 || this.vx === 0) { this.state = 'COOLDOWN'; this.stateTimer = 1.5; this.vx = 0; }
+                        break;
+                    case 'FLY_UP':
+                        this.y -= 300 * dt; if (this.y <= playerObj.y - 250 || this.y < 80) { this.state = 'FLY_HOVER'; this.stateTimer = 1.0; }
+                        break;
+                    case 'FLY_HOVER':
+                        this.stateTimer -= dt; this.vx = Math.max(-250, Math.min(250, distX * 2)); this.facingRight = distX > 0;
+                        if (this.stateTimer <= 0) {
+                            let rand = Math.random();
+                            if (this.phase >= 2 && rand < 0.4) {
+                                this.state = 'LASER_SWEEP'; this.stateTimer = 2.0; this.vx = 0;
+                                let l = new Laser(cx, cy, Math.PI/6, 'SWEEP'); l.sweepSpeed = (Math.PI * 0.6) / 0.6; this.lasers.push(l); sfx.bossLaserCharge();
+                            } else if (this.phase >= 2 && rand < 0.7) {
+                                this.state = 'LASER_LOCK'; this.stateTimer = 1.5; this.vx = 0;
+                                this.lasers.push(new Laser(cx, cy, playerObj, 'LOCK_ON')); sfx.bossLaserCharge();
+                            } else if (this.phase === 3 && rand < 0.9) {
+                                this.state = 'LASER_SPIN'; this.stateTimer = 4.0; this.vx = 0;
+                                for(let i=0; i<2; i++) this.lasers.push(new Laser(cx, cy, i * Math.PI, 'SPIN')); sfx.bossLaserCharge();
+                            } else {
+                                this.state = 'SLAM_DOWN'; this.vx = 0; this.vy = 1800; 
+                            }
+                        }
+                        break;
+                    case 'SLAM_DOWN': break; 
+                    case 'LASER_LOCK': case 'LASER_SWEEP': case 'LASER_SPIN':
+                        this.stateTimer -= dt; if (this.lasers.length === 0) { this.state = 'COOLDOWN'; this.stateTimer = 2.0; }
+                        break;
+                    case 'SUMMON':
+                        this.stateTimer -= dt; this.vx = 0; 
+                        if (this.stateTimer <= 0) {
+                            let newEnemy = new Enemy(cx / tileSize, cy / tileSize, 'jump'); newEnemy.vy = -600; newEnemy.vx = (Math.random() > 0.5 ? 1 : -1) * 200;
+                            enemiesArr.push(newEnemy); sfx.bossSummon(); this.state = 'IDLE'; this.stateTimer = 1.0;
+                        }
+                        break;
+                    case 'COOLDOWN': 
+                        this.stateTimer -= dt; this.vx = 0; if (this.stateTimer <= 0) { this.state = 'IDLE'; this.stateTimer = 0.5; }
+                        break;
+                    case 'HURT':
+                        this.vx = 0; this.stateTimer -= dt; if (this.stateTimer <= 0) { this.state = 'IDLE'; this.stateTimer = 0.5; }
+                        break;
+                }
+            }
+
+            if (this.state !== 'FLY_UP') {
+                this.x += this.vx * dt; this.handleCollisions(blocks, 'x'); this.y += this.vy * dt;
+                let wasInAir = this.vy > 0; this.handleCollisions(blocks, 'y');
+                if (this.state === 'SLAM_DOWN' && wasInAir && this.vy === 0) {
+                    sfx.bossSlam(); shakeTime = 0.4; shakeMag = 20; 
+                    for(let i=0; i<30; i++) {
+                        effects.push(new Particle(this.x+this.w/2, this.y+this.h, '#FFFFFF', 2.0 + Math.random()*3, true));
+                        effects.push(new Particle(this.x+this.w/2, this.y+this.h, '#4A004A', 1.5 + Math.random()*2, true)); 
+                    }
+                    this.state = 'COOLDOWN'; this.stateTimer = 1.5; 
+                }
+            }
+        }
+        pickNextAttack(playerObj) {
+            let rand = Math.random();
+            if (this.phase === 1) {
+                if (rand < 0.7) { this.state = 'ANTICIPATE_DASH'; this.stateTimer = 0.6; sfx.charge(); } else { this.state = 'SUMMON'; this.stateTimer = 0.8; sfx.charge(); }
+            } else if (this.phase === 2) {
+                if (rand < 0.6) { this.state = 'FLY_UP'; sfx.charge(); } else if (rand < 0.8) { this.state = 'ANTICIPATE_DASH'; this.stateTimer = 0.5; sfx.charge(); }
+                else { this.state = 'SUMMON'; this.stateTimer = 0.6; sfx.charge(); }
+            } else {
+                if (rand < 0.7) { this.state = 'FLY_UP'; sfx.charge(); } else if (rand < 0.9) { this.state = 'ANTICIPATE_DASH'; this.stateTimer = 0.3; sfx.charge(); }
+                else { this.state = 'SUMMON'; this.stateTimer = 0.4; sfx.charge(); }
+            }
+        }
+        handleCollisions(blocks, axis) {
+            let margin = 5;
+            for (let b of blocks) {
+                if (b.type === 'spike' || b.type === 'falling') continue; 
+                if (axis === 'x') {
+                    if (this.x < b.x + b.w && this.x + this.w > b.x && this.y + margin < b.y + b.h && this.y + this.h - margin > b.y) {
+                        this.x = this.vx > 0 ? b.x - this.w : b.x + b.w; this.vx = 0; 
+                    }
+                } else {
+                    if (this.x + margin < b.x + b.w && this.x + this.w - margin > b.x && this.y < b.y + b.h && this.y + this.h > b.y) {
+                        if (this.vy > 0) { this.y = b.y - this.h; this.vy = 0; }
+                        else if (this.vy < 0 && this.state !== 'FLY_UP') { this.y = b.y + b.h; this.vy = 0; }
+                    }
+                }
+            }
+        }
+        takeDamage(playerObj) {
+            if (this.invulnerable || this.state === 'HURT') {
+                sfx.bossShieldHit(); playerObj.vy = playerObj.jumpForce * 1.0; 
+                playerObj.vx = (playerObj.x < this.x + this.w/2 ? -600 : 600);
+                for(let i=0; i<10; i++) effects.push(new Particle(playerObj.x, this.y, '#BCBCBC', 1.0, true)); 
+                texts.push(new FloatingText("BLOCKED!", this.x + 10, this.y - 20, '#BCBCBC')); return;
+            } 
+            this.hp--; sfx.bossHit(); playerObj.vy = playerObj.jumpForce * 1.3; 
+            playerObj.vx = (playerObj.x < this.x + this.w/2 ? -800 : 800);
+            score += 500; updateHUD(); updateBossHP(this.hp); shakeTime = 0.2; shakeMag = 10;
+            for(let i=0; i<25; i++) effects.push(new Particle(playerObj.x, this.y, '#E83000', 1.5, true)); 
+            texts.push(new FloatingText("CRITICAL!", this.x + 10, this.y - 20, '#FFCE00'));
+            hitFlashTimer = 0.1; hitStopTimer = 0.15; 
+            
+            if (this.hp <= 0) {
+                this.state = 'DYING'; this.stateTimer = 0; this.originalX = this.x; this.vy = 0; sfx.bossRoar(); this.lasers = []; 
+            } else {
+                this.state = 'HURT'; this.stateTimer = 1.0; this.vy = 0; this.lasers = []; 
+                if (this.hp === 2) { this.phase = 2; texts.push(new FloatingText("PHASE 2: FLY & LASER!", this.x - 20, this.y - 50, '#FFCE00')); } 
+                else if (this.hp === 1) { this.phase = 3; texts.push(new FloatingText("PHASE 3: SPIN LASER!", this.x - 20, this.y - 50, '#FF0000')); }
+            }
+        }
+        draw(ctx) {
+            if (this.y > 2000) return; 
+            ctx.save(); let drawX = this.x; let drawY = this.y;
+            let auraColor = this.phase === 1 ? '#4A004A' : (this.phase === 2 ? '#E83000' : '#FFFFFF');
+
+            if (['LASER_LOCK', 'LASER_SWEEP'].includes(this.state) || this.phase === 3) {
+                ctx.save(); ctx.resetTransform();
+                let darkLevel = this.phase === 3 ? 0.3 : 0.6;
+                ctx.fillStyle = `rgba(0, 0, 0, ${darkLevel})`; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+
+            if (this.state !== 'DYING') {
+                ctx.save(); ctx.translate(drawX + this.w/2, drawY + this.h/2); ctx.rotate(globalTime * 2);
+                ctx.strokeStyle = auraColor; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, this.w/1.5, 0, Math.PI*2); ctx.stroke();
+                ctx.setLineDash([10, 15]); ctx.rotate(-globalTime * 4); ctx.beginPath(); ctx.arc(0, 0, this.w/2, 0, Math.PI*2); ctx.stroke();
+                ctx.restore();
+            }
+
+            (this.trail || []).forEach(t => {
+                ctx.globalAlpha = (t.timer / 0.5) * 0.3;
+                let frameTrail = !this.invulnerable ? assets.bossEyeOpen1 : assets.bossEyeClosed;
+                ctx.drawImage(frameTrail, t.x, t.y, this.w, this.h);
+            });
+            ctx.globalAlpha = 1.0;
+
+            if (this.state === 'HURT' && Math.floor(globalTime * 20) % 2 === 0) ctx.globalAlpha = 0.5;
+            else if (this.invulnerable && this.state !== 'DYING' && Math.floor(globalTime * 10) % 2 === 0) ctx.globalAlpha = 0.9;
+            
+            if (this.state === 'ANTICIPATE_DASH') { drawX += (Math.random() - 0.5) * 8; drawY += (Math.random() - 0.5) * 8; } 
+            else if (['FLY_HOVER','LASER_LOCK','LASER_SWEEP','LASER_SPIN'].includes(this.state)) drawY += Math.sin(globalTime * 10) * 5; 
+            
+            ctx.translate(drawX + this.w/2, drawY + this.h/2);
+
+            let lookOffsetX = 0; let lookOffsetY = 0;
+            if (player && gameState !== 'DYING') {
+                lookOffsetX = Math.max(-10, Math.min(10, (player.x - (drawX + this.w/2)) * 0.03));
+                lookOffsetY = Math.max(-5, Math.min(15, (player.y - (drawY + this.h/2)) * 0.03));
+            }
+
+            let frame = (this.state === 'DYING' || this.invulnerable) ? assets.bossEyeClosed : (Math.floor(this.animTimer) % 2 === 0 ? assets.bossEyeOpen1 : assets.bossEyeOpen2);
+            if(frame === assets.bossEyeClosed) { ctx.shadowBlur = 15; ctx.shadowColor = '#E83000'; }
+            
+            drawY += Math.sin(globalTime * 5) * 10;
+            ctx.drawImage(frame, -this.w/2 + lookOffsetX, -this.h/2 + lookOffsetY, this.w, this.h); 
+            ctx.shadowBlur = 0;
+
+            if (!this.invulnerable && this.state !== 'HURT') {
+                ctx.shadowBlur = 20 + Math.sin(globalTime * 10) * 10;
+                ctx.shadowColor = '#FF0000'; ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                ctx.beginPath(); ctx.arc(lookOffsetX, lookOffsetY, 10, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            ctx.restore();
+
+            if (gameState !== 'DYING') {
+                (this.hands || []).forEach(h => {
+                    ctx.save();
+                    (h.trail || []).forEach(t => { ctx.globalAlpha = (t.timer / 0.3) * 0.4; 
+                        ctx.drawImage(assets.bossHand, t.x - 12, t.y - 27, 120, 150); 
+                    });
+                    ctx.globalAlpha = 1.0;
+
+                    let handJitterX = (Math.random() - 0.5) * 2;
+                    let handJitterY = (Math.random() - 0.5) * 2;
+
+                    if(h.state === 'SLAM_PAUSE') { ctx.shadowBlur = 20; ctx.shadowColor = '#F00'; }
+                    if(h.state === 'SLAM_GROUND') { 
+                        ctx.translate(h.x + h.w/2, h.y + h.h/2); ctx.scale(1.2, 1.2); 
+                        ctx.drawImage(assets.bossHand, -60 + handJitterX, -75 + handJitterY, 120, 150); 
+                    } else {
+                        ctx.drawImage(assets.bossHand, h.x - 12 + handJitterX, h.y - 27 + handJitterY, 120, 150);
+                    }
+                    ctx.restore();
+                });
+            }
+
+            (this.lasers || []).forEach(l => l.draw(ctx)); 
+        }
+    }
+
+    class TrueBoss {
+        constructor(x, y) {
+            this.x = x; this.y = y; this.w = 192; this.h = 192;
+            this.hp = 6; this.phase = 1; this.state = 'FALLING'; this.stateTimer = 0;
+            this.eyeOpen = false; this.animTimer = 0; this.lasers = [];
+            this.originalY = logicalHeight - 420; 
+            this.targetX = this.x;
+            this.trail = []; this.comboLeft = 0; 
+            
+            this.hands = [
+                { x: this.x - 100, y: this.y + 50, ox: -120, oy: 80, state: 'IDLE', timer: 0, w: 96, h: 96, trail: [] }, 
+                { x: this.x + this.w + 50, y: this.y + 50, ox: this.w + 50, oy: 80, state: 'IDLE', timer: 0, w: 96, h: 96, trail: [] } 
+            ];
+        }
+
+        updateIntro(dt) {
+            if (this.state === 'FALLING') {
+                this.y += 3000 * dt; 
+                this.hands.forEach(h => { h.y = this.y + h.oy; h.x = this.x + h.ox; }); 
+                if (this.y >= this.originalY) {
+                    this.y = this.originalY; this.state = 'LANDED';
+                    shakeTime = 1.0; shakeMag = 30; sfx.earthquake(); sfx.trueBossRoar();
+                    for(let i=0; i<50; i++) effects.push(new Particle(this.x + this.w/2, logicalHeight - 100, '#000', 3.0, true));
+                    camera.targetZoom = 1.3; 
+                }
+            } else if (this.state === 'LANDED') {
+                this.stateTimer += dt;
+                this.hands.forEach((h, i) => {
+                    h.targetY = this.y + h.oy + Math.sin(globalTime*3 + i)*20;
+                    h.y += (h.targetY - h.y) * 3 * dt;
+                });
+                if (this.stateTimer > 2.0 && !this.eyeOpen) { this.eyeOpen = true; sfx.bossRoar(); }
+                if (this.stateTimer > 4.5) { this.introDone = true; this.state = 'IDLE'; this.stateTimer = 1.0; camera.targetZoom = 1.0; } 
+            }
+        }
+
+        pickNextAttack(playerObj, enemiesArr) {
+            let cx = this.x + this.w/2; let cy = this.y + this.h/2;
+            let px = playerObj.x + playerObj.w/2; let py = playerObj.y + playerObj.h/2;
+
+            if (this.comboLeft <= 0) {
+                this.comboLeft = this.phase === 1 ? 0 : (this.phase === 2 ? 1 : 2); 
+            } else { this.comboLeft--; }
+
+            let r = Math.random();
+            if (r < 0.3) {
+                this.state = 'HAND_SLAM'; this.stateTimer = 2.0;
+                if (this.phase === 3) {
+                    this.hands[0].state = 'SLAM_TRACK'; this.hands[0].timer = 0.6;
+                    this.hands[1].state = 'SLAM_TRACK'; this.hands[1].timer = 1.0; 
+                } else {
+                    let hIdx = Math.random() > 0.5 ? 0 : 1;
+                    this.hands[hIdx].state = 'SLAM_TRACK'; this.hands[hIdx].timer = 0.8;
+                }
+            } else if (r < 0.5 && this.phase >= 2) {
+                this.state = 'HAND_SWIPE'; this.stateTimer = 2.5;
+                this.hands.forEach(h => { h.state = 'SWIPE_PREP'; h.timer = 0.8; });
+            } else if (r < 0.7) {
+                this.state = 'LASER_LOCK'; this.stateTimer = 1.0;
+                let numLasers = this.phase === 3 ? 3 : 1;
+                for(let i=0; i<numLasers; i++) {
+                    let l = new Laser(cx, cy, playerObj, 'LOCK_ON'); 
+                    l.isGodLaser = true; l.timer = 0.8 + (i * 0.4); this.lasers.push(l); 
+                }
+                sfx.bossLaserCharge();
+            } else if (r < 0.85 && this.phase >= 2) {
+                this.state = 'LASER_SWEEP'; this.stateTimer = 2.5;
+                let l1 = new Laser(cx, cy, Math.PI/4, 'SWEEP'); l1.isGodLaser = true; l1.sweepSpeed = (Math.PI*0.5) / 0.8; this.lasers.push(l1); 
+                if (this.phase === 3) {
+                    let l2 = new Laser(cx, cy, Math.PI*0.75, 'SWEEP'); l2.isGodLaser = true; l2.sweepSpeed = -(Math.PI*0.5) / 0.8; this.lasers.push(l2); 
+                }
+                sfx.bossLaserCharge();
+            } else if (this.phase === 3 && r < 0.95) {
+                this.state = 'WIND_PUSH'; this.stateTimer = 2.0; sfx.wind();
+            } else {
+                this.state = 'SUMMON'; this.stateTimer = 1.0;
+            }
+        }
+
+        updateCombat(dt, playerObj, enemiesArr) {
+            this.animTimer += dt * 3;
+
+            if (globalTime % 0.1 < 0.05 && this.state !== 'DYING') {
+                this.trail.push({x: this.x, y: this.y, timer: 0.5});
+                this.hands.forEach(h => h.trail.push({x: h.x, y: h.y, timer: 0.3}));
+            }
+            (this.trail || []).forEach((t, i) => { t.timer -= dt; if(t.timer<=0) this.trail.splice(i,1); });
+            (this.hands || []).forEach(h => (h.trail || []).forEach((t, i) => { t.timer -= dt; if(t.timer<=0) h.trail.splice(i,1); }));
+
+            if (Math.random() < 0.3 && this.state !== 'DYING') {
+                let px = this.x + Math.random() * this.w; let py = this.y + Math.random() * this.h;
+                effects.push(new Particle(px, py, this.phase === 1 ? '#4A004A' : (this.phase === 2 ? '#E83000' : '#FFF'), 0.5, false));
+            }
+
+            for (let i = (this.lasers || []).length - 1; i >= 0; i--) {
+                this.lasers[i].update(dt, playerObj); if (!this.lasers[i].active) this.lasers.splice(i, 1);
+            }
+
+            if (this.state !== 'DYING') {
+                this.y = this.originalY + Math.sin(globalTime * 2) * 20;
+                this.targetX = playerObj.x - this.w/2;
+                this.x += (this.targetX - this.x) * 0.6 * dt; 
+            }
+
+            (this.hands || []).forEach((h, i) => {
+                switch(h.state) {
+                    case 'IDLE':
+                        h.targetX = this.x + h.ox; h.targetY = this.y + h.oy + Math.sin(globalTime*3 + i)*20;
+                        h.x += (h.targetX - h.x) * 4 * dt; h.y += (h.targetY - h.y) * 4 * dt;
+                        break;
+                    case 'SLAM_TRACK':
+                        h.targetX = playerObj.x - 20; h.targetY = playerObj.y - 300; 
+                        h.x += (h.targetX - h.x) * 8 * dt; h.y += (h.targetY - h.y) * 8 * dt; 
+                        h.timer -= dt; if (h.timer <= 0) { h.state = 'SLAM_PAUSE'; h.timer = 0.4; } 
+                        break;
+                    case 'SLAM_PAUSE':
+                        h.x += (Math.random()-0.5)*10; h.timer -= dt; 
+                        if (h.timer <= 0) { h.state = 'SLAM_FALL'; }
+                        break;
+                    case 'SLAM_FALL':
+                        h.y += 3500 * dt; 
+                        if (h.y >= logicalHeight - 150) { 
+                            h.y = logicalHeight - 150; h.state = 'SLAM_GROUND'; h.timer = 1.0;
+                            shakeTime = 0.3; shakeMag = 15; sfx.bossSlam();
+                            for(let p=0; p<20; p++) {
+                                effects.push(new Particle(h.x+h.w/2, h.y+h.h, '#FFFFFF', 2.0 + Math.random()*3, true)); 
+                                effects.push(new Particle(h.x+h.w/2, h.y+h.h, '#4A004A', 1.5 + Math.random()*2, true)); 
+                            }
+                        }
+                        break;
+                    case 'SLAM_GROUND':
+                        h.timer -= dt; if (h.timer <= 0) { h.state = 'IDLE'; }
+                        break;
+                    case 'SWIPE_PREP':
+                        h.targetX = i === 0 ? -100 : logicalWidth + 100; h.targetY = logicalHeight - 150;
+                        h.x += (h.targetX - h.x) * 5 * dt; h.y += (h.targetY - h.y) * 5 * dt;
+                        h.timer -= dt; if(h.timer <= 0) { h.state = 'SWIPE_GO'; }
+                        break;
+                    case 'SWIPE_GO':
+                        h.x += (i === 0 ? 1 : -1) * 1200 * dt; 
+                        if ((i === 0 && h.x > logicalWidth) || (i === 1 && h.x < -100)) { h.state = 'IDLE'; }
+                        break;
+                }
+            });
+
+            switch(this.state) {
+                case 'IDLE':
+                    this.stateTimer -= dt; this.eyeOpen = true; 
+                    if (this.stateTimer <= 0) {
+                        this.eyeOpen = false; this.pickNextAttack(playerObj, enemiesArr);
+                    }
+                    break;
+                case 'HAND_SLAM': case 'HAND_SWIPE': case 'LASER_SWEEP': case 'LASER_LOCK':
+                    this.stateTimer -= dt;
+                    if (this.stateTimer <= 0 && this.lasers.length === 0 && this.hands[0].state === 'IDLE' && this.hands[1].state === 'IDLE') {
+                        if (this.comboLeft > 0) this.pickNextAttack(playerObj, enemiesArr);
+                        else { this.state = 'COOLDOWN'; this.stateTimer = this.phase === 3 ? 0.6 : 1.5; this.eyeOpen = true; }
+                    }
+                    break;
+                case 'WIND_PUSH':
+                    this.stateTimer -= dt; playerObj.vx -= 700 * dt; 
+                    if (Math.random() < 0.4) effects.push(new Particle(logicalWidth, playerObj.y + Math.random()*100 - 50, '#FFF', 2.0));
+                    if (this.stateTimer <= 0) { 
+                        if (this.comboLeft > 0) this.pickNextAttack(playerObj, enemiesArr);
+                        else { this.state = 'COOLDOWN'; this.stateTimer = 1.0; this.eyeOpen = true; }
+                    }
+                    break;
+                case 'SUMMON':
+                    this.stateTimer -= dt;
+                    if (this.stateTimer <= 0) {
+                        for(let i=0; i< (this.phase===3?3:2); i++) {
+                            let newE = new Enemy(this.x/tileSize + Math.random()*2, this.y/tileSize, 'jump');
+                            newE.vy = -800; newE.vx = (Math.random() - 0.5) * 500; enemiesArr.push(newE);
+                        }
+                        sfx.bossSummon(); 
+                        if (this.comboLeft > 0) this.pickNextAttack(playerObj, enemiesArr);
+                        else { this.state = 'COOLDOWN'; this.stateTimer = 1.5; this.eyeOpen = true; }
+                    }
+                    break;
+                case 'COOLDOWN':
+                    this.stateTimer -= dt; if (this.stateTimer <= 0) { this.state = 'IDLE'; this.stateTimer = 0.5; }
+                    break;
+                case 'HURT':
+                    this.stateTimer -= dt; if (this.stateTimer <= 0) { this.state = 'IDLE'; this.stateTimer = 0.5; }
+                    break;
+                case 'DYING':
+                    this.stateTimer += dt;
+                    this.x += (Math.random() - 0.5) * 30; this.y += (Math.random() - 0.5) * 30;
+                    this.hands.forEach(h => h.y += 1000 * dt); 
+                    if (Math.random() < 0.4) effects.push(new Particle(this.x + Math.random() * this.w, this.y + Math.random() * this.h, '#FF0000', 4, false));
+                    if (this.stateTimer > 4.0) { whiteFlash = 1.0; sfx.whiteFlashSound(); triggerLevelCleared(); }
+                    break;
+            }
+        }
+
+        takeDamage(playerObj) {
+            if (!this.eyeOpen || this.state === 'HURT' || this.state === 'DYING') {
+                sfx.bossShieldHit(); playerObj.vy = playerObj.jumpForce * 1.0; 
+                playerObj.vx = (playerObj.x < this.x + this.w/2 ? -600 : 600);
+                texts.push(new FloatingText("BLOCKED!", this.x + this.w/2, this.y, '#BCBCBC')); return;
+            }
+
+            this.hp--; sfx.trueBossRoar(); playerObj.vy = playerObj.jumpForce * 1.5; 
+            playerObj.vx = (playerObj.x < this.x + this.w/2 ? -1000 : 1000);
+            
+            score += 1000; updateHUD(); updateBossHP(this.hp, 6); 
+            shakeTime = 0.5; shakeMag = 20; whiteFlash = 0.2; hitFlashTimer = 0.15;
+            hitStopTimer = 0.15; 
+            
+            for(let i=0; i<40; i++) effects.push(new Particle(playerObj.x, this.y + this.h/2, '#FF0000', 2.0, true)); 
+            texts.push(new FloatingText("GOD HIT!", this.x + this.w/2, this.y, '#FFCE00'));
+            
+            if (this.hp <= 0) {
+                this.state = 'DYING'; this.stateTimer = 0; sfx.earthquake(); this.lasers = [];
+            } else {
+                this.state = 'HURT'; this.stateTimer = 1.0; this.eyeOpen = false; this.lasers = [];
+                if(this.hp === 4) { this.phase = 2; texts.push(new FloatingText("PHASE 2!", this.x + this.w/2, this.y-50, '#FFCE00')); }
+                if(this.hp === 2) { this.phase = 3; texts.push(new FloatingText("RAGE!", this.x + this.w/2, this.y-50, '#FF0000')); camera.targetZoom = 1.1; } 
+            }
+        }
+
+        draw(ctx) {
+            ctx.save(); let drawX = this.x; let drawY = this.y;
+            let auraColor = this.phase === 1 ? '#4A004A' : (this.phase === 2 ? '#E83000' : '#FFFFFF');
+
+            if (['LASER_LOCK', 'LASER_SWEEP'].includes(this.state) || this.phase === 3) {
+                ctx.save(); ctx.resetTransform();
+                let darkLevel = this.phase === 3 ? 0.3 : 0.6;
+                ctx.fillStyle = `rgba(0, 0, 0, ${darkLevel})`; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+
+            if (this.state !== 'DYING') {
+                ctx.save(); ctx.translate(drawX + this.w/2, drawY + this.h/2); ctx.rotate(globalTime * 2);
+                ctx.strokeStyle = auraColor; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, this.w/1.5, 0, Math.PI*2); ctx.stroke();
+                ctx.setLineDash([10, 15]); ctx.rotate(-globalTime * 4); ctx.beginPath(); ctx.arc(0, 0, this.w/2, 0, Math.PI*2); ctx.stroke();
+                ctx.restore();
+            }
+
+            (this.trail || []).forEach(t => {
+                ctx.globalAlpha = (t.timer / 0.5) * 0.3;
+                let frameTrail = this.eyeOpen ? assets.trueBossEyeOpen : assets.trueBossEyeClosed;
+                ctx.drawImage(frameTrail, t.x, t.y, this.w, this.h);
+            });
+            ctx.globalAlpha = 1.0;
+
+            if (this.state === 'HURT' && Math.floor(globalTime * 20) % 2 === 0) ctx.globalAlpha = 0.5;
+            else if (this.invulnerable && this.state !== 'DYING' && Math.floor(globalTime * 10) % 2 === 0) ctx.globalAlpha = 0.9;
+            
+            ctx.translate(drawX + this.w/2, drawY + this.h/2);
+
+            let lookOffsetX = 0; let lookOffsetY = 0;
+            if (player && gameState !== 'DYING') {
+                lookOffsetX = Math.max(-10, Math.min(10, (player.x - (drawX + this.w/2)) * 0.03));
+                lookOffsetY = Math.max(-5, Math.min(15, (player.y - (drawY + this.h/2)) * 0.03));
+            }
+
+            let frame = (this.state === 'DYING' || this.invulnerable) ? assets.bossEyeClosed : (Math.floor(this.animTimer) % 2 === 0 ? assets.trueBossEyeOpen : assets.trueBossEyeOpen);
+            if(frame === assets.trueBossEyeClosed) { ctx.shadowBlur = 15; ctx.shadowColor = '#E83000'; }
+            
+            drawY += Math.sin(globalTime * 5) * 10;
+
+            let jitterX = this.state !== 'DYING' ? (Math.random() - 0.5) * 3 : 0;
+            let jitterY = this.state !== 'DYING' ? (Math.random() - 0.5) * 3 : 0;
+
+            ctx.drawImage(frame, -this.w/2 + lookOffsetX + jitterX, -this.h/2 + lookOffsetY + jitterY, this.w, this.h); 
+            ctx.shadowBlur = 0;
+
+            if (this.eyeOpen && this.state !== 'HURT') {
+                ctx.shadowBlur = 30 + Math.sin(globalTime * 10) * 15;
+                ctx.shadowColor = '#FF0000'; ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                ctx.beginPath(); ctx.arc(lookOffsetX + jitterX, lookOffsetY + jitterY, 15, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            ctx.restore();
+
+            if (gameState !== 'DYING') {
+                (this.hands || []).forEach(h => {
+                    ctx.save();
+                    (h.trail || []).forEach(t => { ctx.globalAlpha = (t.timer / 0.3) * 0.4; 
+                        ctx.drawImage(assets.bossHand, t.x - 12, t.y - 27, 120, 150); 
+                    });
+                    ctx.globalAlpha = 1.0;
+
+                    let handJitterX = (Math.random() - 0.5) * 2;
+                    let handJitterY = (Math.random() - 0.5) * 2;
+
+                    if(h.state === 'SLAM_PAUSE') { ctx.shadowBlur = 20; ctx.shadowColor = '#F00'; }
+                    if(h.state === 'SLAM_GROUND') { 
+                        ctx.translate(h.x + h.w/2, h.y + h.h/2); ctx.scale(1.2, 1.2); 
+                        ctx.drawImage(assets.bossHand, -60 + handJitterX, -75 + handJitterY, 120, 150); 
+                    } else {
+                        ctx.drawImage(assets.bossHand, h.x - 12 + handJitterX, h.y - 27 + handJitterY, 120, 150);
+                    }
+                    ctx.restore();
+                });
+            }
+
+            (this.lasers || []).forEach(l => l.draw(ctx)); 
+        }
+    }
+
+    class Player {
+        constructor(x, y) {
+            this.x = x; this.y = y; this.w = 26; this.h = 38; 
+            this.vx = 0; this.vy = 0; this.speed = 2500; this.maxSpeed = 380;
+            this.friction = 0.85; this.jumpForce = -1050; 
+            this.grounded = false; this.facingRight = true; this.animTimer = 0; this.rotation = 0; 
+        }
+        jump() {
+            if (this.grounded && (gameState === 'PLAYING' || gameState === 'TRUE_BOSS_FIGHT')) {
+                this.vy = this.jumpForce; this.grounded = false; sfx.jump();
+                effects.push(new Particle(this.x + this.w/2, this.y + this.h, '#CCCCCC', 0.5, false));
+            }
+        }
+        update(dt, blocks, enemies) {
+            if (gameState === 'STORY_OUTRO_FAKE' || gameState === 'TRUE_BOSS_INTRO' || gameState === 'STORY_OUTRO') {
+                this.vx = 0; this.animTimer = 0; this.vy += gravity * dt; this.y += this.vy * dt;
+                this.handleCollisions(blocks, 'y'); return;
+            }
+            if (gameState === 'DYING') return;
+
+            for(let b of blocks) {
+                if(b.type === 'spike') {
+                    let hitboxMargin = 12; 
+                    if (this.x + hitboxMargin < b.x + b.w && this.x + this.w - hitboxMargin > b.x && this.y + hitboxMargin < b.y + b.h && this.y + this.h > b.y + hitboxMargin) {
+                        triggerDeathSequence(); return; 
+                    }
+                }
+            }
+
+            if (keys.left) { this.vx -= this.speed * dt; this.facingRight = false; }
+            if (keys.right) { this.vx += this.speed * dt; this.facingRight = true; }
+
+            this.vx *= Math.pow(this.friction, dt * 60);
+            if (Math.abs(this.vx) > this.maxSpeed) this.vx = Math.sign(this.vx) * this.maxSpeed;
+            if (Math.abs(this.vx) < 5) this.vx = 0;
+            if (this.vx !== 0 && this.grounded) {
+                this.animTimer += dt * 12; 
+                if (Math.random() < 0.2) effects.push(new Particle(this.x + this.w/2, this.y + this.h, '#AAAAAA', 0.2, false));
+            } else {
+                this.animTimer = 0;
+            }
+
+            this.x += this.vx * dt; this.handleCollisions(blocks, 'x');
+            this.vy += gravity * dt; this.y += this.vy * dt;
+            this.grounded = false; this.handleCollisions(blocks, 'y');
+
+            if (boss && boss.state !== 'DYING' && gameState === 'PLAYING') {
+                let hitMargin = 15
+        ;
+                if (this.x < boss.x + boss.w - hitMargin && this.x + this.w > boss.x + hitMargin && this.y < boss.y + boss.h - hitMargin && this.y + this.h > boss.y + hitMargin) {
+                    if (this.vy > 0 && this.y + this.h - this.vy * dt <= boss.y + 40) boss.takeDamage(this); 
+                    else if (boss.state !== 'HURT') triggerDeathSequence(); 
+                }
+            }
+
+            if (trueBoss && trueBoss.state !== 'DYING' && gameState === 'TRUE_BOSS_FIGHT') {
+                for (let h of trueBoss.hands) {
+                    let handMargin = 25; 
+                    if (this.x + 10 < h.x + h.w - handMargin && this.x + this.w - 10 > h.x + handMargin && 
+                        this.y + 10 < h.y + h.h - handMargin && this.y + this.h > h.y + handMargin) {
+                        triggerDeathSequence(); return;
+                    }
+                }
+                
+                let coreX = trueBoss.x + 64; let coreW = trueBoss.w - 128; 
+                let coreY = trueBoss.y + 64; let coreH = trueBoss.h - 128; 
+                if (this.x < coreX + coreW && this.x + this.w > coreX && this.y < coreY + coreH && this.y + this.h > coreY) {
+                    if (this.vy > 0 && this.y + this.h - this.vy * dt <= coreY + 30) trueBoss.takeDamage(this);
+                    else if (trueBoss.state !== 'HURT') triggerDeathSequence();
+                }
+            }
+
+            for (let e of enemies) {
+                if (e.dead) continue;
+                if (this.x < e.x + e.w && this.x + this.w > e.x && this.y < e.y + e.h && this.y + this.h > e.y) {
+                    if (this.vy > 0 && this.y + this.h - this.vy * dt <= e.y + 10) {
+                        e.dead = true; e.deadTimer = 1.0; this.vy = this.jumpForce * 0.8; 
+                        for(let i=0; i<15; i++) effects.push(new Particle(e.x + 16, e.y + 16, '#FFFFFF', 1.2, true));
+                        texts.push(new FloatingText("+200", e.x, e.y, '#88F800'));
+                        shakeTime = 0.1; shakeMag = 5; score += 200; sfx.stomp(); updateHUD();
+                        hitFlashTimer = 0.05; hitStopTimer = 0.05; 
+                    } else triggerDeathSequence(); 
+                }
+            }
+            if (this.y > logicalHeight + 100) triggerDeathSequence(); 
+        }
+
+        handleCollisions(blocks, axis) {
+            let margin = 3; 
+            for (let b of blocks) {
+                if (b.type === 'spike') continue;
+                if (b.type === 'falling' && b.isFalling && this.vy > b.vy) continue;
+                let bx = b.x, by = b.y, bw = b.w, bh = b.h;
+                if (b.type === 'pipe') { bx += 4; bw -= 8; } 
+
+                if (axis === 'x') {
+                    if (this.x < bx + bw && this.x + this.w > bx && this.y + margin < by + bh && this.y + this.h - margin > by) {
+                        if (b.isEndPipe && gameState === 'PLAYING') { triggerLevelCleared(); return; }
+                        if (this.vx > 0) this.x = bx - this.w; else if (this.vx < 0) this.x = bx + bw;
+                        this.vx = 0;
+                    }
+                } else if (axis === 'y') {
+                    if (this.x + margin < bx + bw && this.x + this.w - margin > bx && this.y < by + bh && this.y + this.h > by) {
+                        if (this.vy > 0) { 
+                            if (b.isEndPipe && gameState === 'PLAYING') { triggerLevelCleared(); return; }
+                            if (b.type === 'falling') b.triggerFall();
+                            if(this.vy > 1000 && !['STORY_OUTRO_FAKE','TRUE_BOSS_INTRO','STORY_OUTRO'].includes(gameState)) { 
+                                for(let i=0; i<10; i++) effects.push(new Particle(this.x+13, this.y+38, '#FFF', 0.8));
+                                shakeTime = 0.1; shakeMag = 3;
+                            }
+                            this.y = by - this.h; this.grounded = true; this.vy = 0;
+                        } else if (this.vy < 0) { 
+                            this.y = by + bh; this.vy = 0; if (b.bump) b.bump(); 
+                        }
+                    }
+                }
+            }
+        }
+
+        draw(ctx) {
+            if (gameState === 'DYING') return; 
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h);
+            if (!this.facingRight) ctx.scale(-1, 1);
+            let img = assets.playerIdle;
+            if (!this.grounded) img = assets.playerJump;
+            else if (Math.abs(this.vx) > 10) img = Math.floor(this.animTimer) % 2 === 0 ? assets.playerWalk1 : assets.playerIdle;
+            ctx.drawImage(img, -20, -40, 40, 40);
+            ctx.restore();
+        }
+    }
+
+    let player, camera, bg, levelBlocks = [], enemies = [], effects = [], texts = [];
+    let boss = null; let trueBoss = null;
+
+    function buildLevel(levelIdx) {
+        levelBlocks = []; enemies = []; boss = null; trueBoss = null;
+        const map = gameLevels[levelIdx]; const mapWidth = map[0].length;
+        
+        isBossLevel = true; 
+
+        for (let row = 0; row < map.length; row++) {
+            for (let col = 0; col < mapWidth; col++) {
+                const char = map[row][col];
+                if (char === 'G') levelBlocks.push(new Block(col, row, 'ground'));
+                else if (char === 'B') levelBlocks.push(new Block(col, row, 'brick'));
+                else if (char === '?') levelBlocks.push(new Block(col, row, 'question'));
+                else if (char === '^') levelBlocks.push(new Block(col, row, 'spike'));
+                else if (char === 'F') levelBlocks.push(new Block(col, row, 'falling'));
+                else if (char === 'P') levelBlocks.push(new Block(col, row, 'pipe', 80, 160)); 
+                else if (char === 'E') enemies.push(new Enemy(col, row, 'dash'));
+                else if (char === 'J') enemies.push(new Enemy(col, row, 'jump'));
+                else if (char === 'X') boss = new Boss(col, row); 
+            }
+        }
+        
+        document.getElementById('boss-hp-container').classList.remove('hidden');
+        document.getElementById('boss-hp-label').innerText = "THE FALLEN EYE"; updateBossHP(3, 3); 
+    }
+
+    function updateBossHP(hp, maxHp = 3) {
+        const fill = document.getElementById('boss-hp-fill');
+        fill.style.width = `${(Math.max(0, hp) / maxHp) * 100}%`;
+    }
+
+    function drawPlayerPiece(ctx, img, piece, ox, oy) {
+        let sx, sy, sw, sh, dx, dy;
+        if(piece === 'LArm') { sx=0; sy=20; sw=10; sh=13; dx=-20; dy=-20; }
+        if(piece === 'RArm') { sx=30; sy=20; sw=10; sh=13; dx=10; dy=-20; }
+        if(piece === 'LLeg') { sx=5; sy=32; sw=10; sh=8; dx=-15; dy=-8; }
+        if(piece === 'RLeg') { sx=22; sy=32; sw=10; sh=8; dx=2; dy=-8; }
+        if(piece === 'UpperTorso') { sx=7; sy=0; sw=26; sh=23; dx=-13; dy=-40; }
+        if(piece === 'LowerTorso') { sx=7; sy=23; sw=26; sh=10; dx=-13; dy=-17; }
+        
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, sw, sh);
+        ctx.restore();
+    }
+
+    function initGame(resetMode = 'FULL') {
+        if(resetMode === 'FULL') {
+            currentLevelIndex = 0; score = 0; coinsCount = 0; checkpointScore = 0; checkpointCoins = 0;
+            checkpointTrueBoss = false; 
+        } else if (resetMode === 'LEVEL') {
+            score = checkpointScore; coinsCount = checkpointCoins;
+        } else if (resetMode === 'NEXT') {
+            checkpointScore = score; checkpointCoins = coinsCount; checkpointTrueBoss = false;
+        }
+
+        document.getElementById('game-container').className = ''; 
+        document.getElementById('boss-hp-container').classList.add('hidden');
+
+        player = new Player(100, -300); 
+        camera = new Camera(); bg = new Background();
+        buildLevel(currentLevelIndex); 
+        effects = []; texts = [];
+        
+        deathPhase = ''; deathTimer = 0;
+        fadeOpacity = 0; shakeTime = 0; shakeMag = 0; storyTimer = 0; whiteFlash = 0; hitFlashTimer = 0; hitStopTimer = 0;
+        
+        deathBloodAlpha = 0; bloodPuddle = []; guts = [];
+        dHand1 = {x:0, y:0, tx:0, ty:0}; 
+        dHand2 = {x:0, y:0, tx:0, ty:0}; 
+        dUpperY = 0; 
+        
+        p_Limbs = { LArm: true, RArm: true, LLeg: true, RLeg: true, UpperTorso: true, LowerTorso: true };
+        flyingLimbs = [];
+
+        if (resetMode === 'LEVEL' && checkpointTrueBoss) {
+            document.getElementById('game-container').classList.add('intro-dark');
+            gameState = 'TRUE_BOSS_INTRO'; storyTimer = 5.0; 
+            trueBoss = new TrueBoss(player.x + 400, -500); boss = null;
+            document.getElementById('boss-hp-container').classList.remove('hidden');
+            document.getElementById('boss-hp-label').innerText = "THE EYE GOD"; updateBossHP(6, 6); 
+        } 
+        else {
+            introTimer = 1.0; bossIntroTimer = 2.0; gameState = 'INTRO'; 
+            if (isBossLevel) document.getElementById('game-container').classList.add('boss-arena');
+        }
+        
+        timeLeft = 300; timeTimer = 0; updateHUD();
+        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+        document.getElementById('hud').classList.remove('hidden');
+    }
+
+    function updateHUD() {
+        document.getElementById('ui-level').innerText = `1-${currentLevelIndex + 1}`;
+        document.getElementById('ui-score').innerText = String(score).padStart(6, '0');
+        document.getElementById('ui-coins').innerText = `x ${String(coinsCount).padStart(2, '0')}`;
+        document.getElementById('ui-time').innerText = Math.ceil(timeLeft);
+    }
+
+    function tearLimb(type, vx, vy) {
+        p_Limbs[type] = false;
+        flyingLimbs.push({ type: type, x: player.x + 13, y: player.y + 19, vx: vx, vy: vy, rot: 0, rotV: (Math.random()-0.5)*10 });
+        for(let i=0; i<60; i++) {
+            effects.push(new Particle(player.x + 13 + (Math.random()-0.5)*30, player.y + 19 + (Math.random()-0.5)*30, '#8B0000', 4.0 + Math.random()*5, true));
+            effects.push(new Particle(player.x + 13 + (Math.random()-0.5)*30, player.y + 19 + (Math.random()-0.5)*30, '#500000', 3.0 + Math.random()*3, true));
+        }
+        for(let i=0; i<15; i++) {
+            bloodPuddle.push({x: player.x+13+(Math.random()-0.5)*120, w: 15+Math.random()*40, h: 5+Math.random()*15});
+        }
+        try { goreSound.currentTime = 0; goreSound.play().catch(e=>{}); } catch(e){}
+        sfx.slash(); shakeTime = 0.3; shakeMag = 20;
+    }
+
+    function nextPhase(phase, time, soundFunc) {
+        deathPhase = phase; deathTimer = time; if(soundFunc) soundFunc();
+    }
+
+    function triggerDeathSequence() {
+        if (['DYING','GAMEOVER','WIN_CUTSCENE','WIN','STORY_OUTRO','STORY_OUTRO_FAKE','TRUE_BOSS_INTRO'].includes(gameState)) return;
+        gameState = 'DYING'; 
+        document.getElementById('hud').classList.add('hidden'); 
+        
+        hitStopTimer = 0.5; 
+        camera.targetZoom = 2.0; 
+        
+        deathBloodAlpha = 0; bloodPuddle = []; guts = []; flyingLimbs = [];
+        p_Limbs = { LArm: true, RArm: true, LLeg: true, RLeg: true, UpperTorso: true, LowerTorso: true };
+        
+        let cx = player.x + 13; let cy = player.y + 19;
+        dHand1 = {x: cx - 200, y: cy - 400, tx: cx - 20, ty: cy};
+        dHand2 = {x: cx + 200, y: cy + 400, tx: cx + 40, ty: cy + 10};
+        dUpperY = player.y + 38;
+
+        shakeTime = 0.5; shakeMag = 5;
+        nextPhase('APPROACH_L_ARM', 0.5, sfx.eerieAmbience);
+    }
+
+    function triggerFakeEndingSequence() {
+        gameState = 'STORY_OUTRO_FAKE'; storyTimer = 0; whiteFlash = 0;
+        player.vx = 0; player.animTimer = 0; camera.targetZoom = 1.0;
+        document.getElementById('boss-hp-container').classList.add('hidden');
+    }
+
+    function triggerLevelCleared() {
+        if(['WIN_CUTSCENE','WIN','STORY_OUTRO'].includes(gameState)) return;
+        score += Math.ceil(timeLeft) * 10; document.getElementById('final-score').innerText = score;
+        
+        if (isBossLevel) {
+            gameState = 'STORY_OUTRO'; storyTimer = 0; player.vx = 0; player.animTimer = 0; camera.targetZoom = 1.0;
+            document.getElementById('boss-hp-container').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden'); 
+            document.getElementById('game-container').classList.remove('intro-dark'); 
+        } else {
+            gameState = 'WIN_CUTSCENE'; sfx.finish(); player.vx = 150; player.vy = 0; winTimer = 4.0; 
+        }
+    }
+
+    function showWinScreen(isTrueEnding = false) {
+        gameState = 'WIN';
+        const winScreen = document.getElementById('game-win-screen');
+        const btnNext = document.getElementById('btn-next-level');
+        const btnPlayAgain = document.getElementById('btn-play-again');
+        const winTitle = document.getElementById('win-title');
+        const winSubtitle = document.getElementById('win-subtitle');
+        const finalScoreText = document.getElementById('final-score');
+
+        if (isTrueEnding) {
+            winScreen.style.background = '#000'; winTitle.innerText = "THE END";
+            winTitle.style.color = "#4ADE80"; winTitle.style.textShadow = "0 0 20px #4ADE80"; winTitle.style.letterSpacing = "5px";
+            winSubtitle.innerText = "Mimpi Buruk Telah Usai."; finalScoreText.style.color = "#4ADE80";
+            btnNext.classList.add('hidden'); btnPlayAgain.classList.remove('hidden');
+        } else {
+            winScreen.style.background = 'rgba(0,0,0,0.6)'; winTitle.innerText = "LEVEL CLEARED!";
+            winTitle.style.color = "#FFCE00"; winTitle.style.textShadow = "4px 4px 0 #D22824, -2px -2px 0 #D22824, 4px -2px 0 #D22824, -2px 4px 0 #D22824, 0 8px 0 #000";
+            winTitle.style.letterSpacing = "3px"; winSubtitle.innerText = "Kerja Bagus!";
+            finalScoreText.style.color = "#FFCE00"; btnNext.classList.remove('hidden'); btnPlayAgain.classList.add('hidden');
+        }
+        winScreen.classList.remove('hidden');
+    }
+
+    function triggerGameOver() {
+        if(gameState === 'GAMEOVER') return;
+        gameState = 'GAMEOVER'; sfx.die(); 
+        document.getElementById('game-over-level').innerText = `1-${currentLevelIndex + 1}`;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+    function update(dt) {
+        globalTime += dt; 
+        if (hitFlashTimer > 0) hitFlashTimer -= dt; 
+
+        for (let i = effects.length - 1; i >= 0; i--) { effects[i].update(dt); if (effects[i].life <= 0) effects.splice(i, 1); }
+        for (let i = texts.length - 1; i >= 0; i--) { texts[i].update(dt); if (texts[i].life <= 0) texts.splice(i, 1); }
+
+        if (gameState === 'STORY_OUTRO_FAKE') {
+            storyTimer += dt; player.update(dt, levelBlocks, enemies); camera.update(dt);
+            if (storyTimer < 3.0 && boss) boss.y -= 80 * dt; 
+            else if (storyTimer > 3.0 && storyTimer < 3.1 && boss) {
+                whiteFlash = 1.0; sfx.whiteFlashSound(); boss = null; 
+                document.getElementById('game-container').classList.remove('boss-arena'); 
+            } else if (storyTimer > 3.1 && storyTimer < 6.0) { whiteFlash = Math.max(0, whiteFlash - dt * 0.5); } 
+            else if (storyTimer > 7.0 && storyTimer < 7.1) { sfx.eerieAmbience(); document.getElementById('game-container').classList.add('intro-dark'); } 
+            else if (storyTimer > 9.0) {
+                trueBoss = new TrueBoss(player.x + 400, -500); 
+                gameState = 'TRUE_BOSS_INTRO'; storyTimer = 0; checkpointTrueBoss = true; 
+            }
+            return;
+        }
+
+        if (gameState === 'TRUE_BOSS_INTRO') {
+            storyTimer += dt; player.update(dt, levelBlocks, enemies); camera.update(dt);
+            if (trueBoss) trueBoss.updateIntro(dt);
+            if (trueBoss && trueBoss.introDone && storyTimer > 6) {
+                gameState = 'TRUE_BOSS_FIGHT'; document.getElementById('boss-hp-container').classList.remove('hidden');
+                document.getElementById('boss-hp-label').innerText = "THE EYE GOD"; updateBossHP(6, 6); 
+            }
+            return;
+        }
+
+        if (gameState === 'TRUE_BOSS_FIGHT') {
+            timeTimer += dt;
+            if (timeTimer >= 1) { timeLeft--; timeTimer = 0; updateHUD(); if (timeLeft <= 0) triggerDeathSequence(); }
+            if (shakeTime > 0) shakeTime -= dt;
+            player.update(dt, levelBlocks, enemies);
+            if (trueBoss) trueBoss.updateCombat(dt, player, enemies); 
+            camera.update(dt); levelBlocks.forEach(b => b.update(dt)); enemies.forEach(e => e.update(dt, levelBlocks, player));
+            return;
+        }
+
+        if (gameState === 'STORY_OUTRO') {
+            storyTimer += dt; player.update(dt, levelBlocks, enemies); camera.update(dt);
+            if (storyTimer > 3.0 && storyTimer < 3.1) whiteFlash = Math.max(0, whiteFlash - dt * 0.5); 
+            if (storyTimer > 8) showWinScreen(true); 
+            return;
+        }
+
+        if (gameState === 'INTRO') {
+            player.vy += gravity * dt; player.y += player.vy * dt;
+            player.handleCollisions(levelBlocks, 'y'); camera.update(dt);
+            if (player.grounded) {
+                introTimer -= dt;
+                if (introTimer <= 0) {
+                    if (isBossLevel && boss) { gameState = 'BOSS_INTRO'; sfx.bossRoar(); shakeTime = 0.5; shakeMag = 15; } 
+                    else gameState = 'PLAYING';
+                }
+            }
+            return;
+        }
+
+        if (gameState === 'BOSS_INTRO') { camera.update(dt); bossIntroTimer -= dt; if (bossIntroTimer <= 0) gameState = 'PLAYING'; return; }
+
+        if (gameState === 'WIN_CUTSCENE') {
+            player.vx = 150; player.animTimer += dt * 10; player.vy += gravity * dt;
+            player.x += player.vx * dt; player.y += player.vy * dt;
+            player.handleCollisions(levelBlocks, 'y'); camera.update(dt);
+            if (Math.random() < 0.05) {
+                let fx = player.x + (Math.random() - 0.5) * 600; let fy = player.y - 100 - Math.random() * 300;
+                let colors = ['#F8B800', '#E83000', '#88F800', '#FFF', '#0058F8'];
+                let chosenColor = colors[Math.floor(Math.random() * colors.length)];
+                for(let i=0; i<30; i++) effects.push(new Particle(fx, fy, chosenColor, 2.5, true));
+                sfx.firework();
+            }
+            winTimer -= dt; if (winTimer <= 0) showWinScreen(false); return;
+        }
+
+        // 🔥 PROCEDURAL 12-FRAME ANIMATION (STATE MACHINE)
+        if (gameState === 'DYING') {
+            deathTimer -= dt;
+
+            // Lerp Hands Position
+            dHand1.x += (dHand1.tx - dHand1.x) * 10 * dt;
+            dHand1.y += (dHand1.ty - dHand1.y) * 10 * dt;
+            dHand2.x += (dHand2.tx - dHand2.x) * 10 * dt;
+            dHand2.y += (dHand2.ty - dHand2.y) * 10 * dt;
+
+            // Physics for Torn Limbs
+            flyingLimbs.forEach(l => {
+                l.vy += gravity * dt; l.x += l.vx * dt; l.y += l.vy * dt; l.rot += l.rotV * dt;
+                if(l.y > player.y + 35) { l.y = player.y + 35; l.vx = 0; l.vy = 0; l.rotV = 0; }
+            });
+
+            if (deathTimer <= 0) {
+                let cx = player.x + 13; let cy = player.y + 19;
+                switch(deathPhase) {
+                    case 'APPROACH_L_ARM':
+                        nextPhase('GRAB_L_ARM', 0.5, sfx.bump); shakeTime=0.2; shakeMag=5;
+                        break;
+                    case 'GRAB_L_ARM':
+                        tearLimb('LArm', -250, -300); dHand1.tx -= 50; dHand1.ty -= 50;
+                        nextPhase('TEAR_L_ARM', 0.4);
+                        break;
+                    case 'TEAR_L_ARM':
+                        dHand1.tx = cx + 30; dHand1.ty = cy - 10; dHand2.tx = cx - 40; dHand2.ty = cy + 10;
+                        nextPhase('APPROACH_R_ARM', 0.4);
+                        break;
+                    case 'APPROACH_R_ARM':
+                        nextPhase('GRAB_R_ARM', 0.5, sfx.bump); shakeTime=0.2; shakeMag=5;
+                        break;
+                    case 'GRAB_R_ARM':
+                        tearLimb('RArm', 250, -300); dHand1.tx += 50; dHand1.ty -= 50;
+                        nextPhase('TEAR_R_ARM', 0.4);
+                        break;
+                    case 'TEAR_R_ARM':
+                        dHand1.tx = cx - 10; dHand1.ty = cy + 30; dHand2.tx = cx + 30; dHand2.ty = cy - 10;
+                        nextPhase('APPROACH_L_LEG', 0.4);
+                        break;
+                    case 'APPROACH_L_LEG':
+                        nextPhase('GRAB_L_LEG', 0.5, sfx.bump); shakeTime=0.2; shakeMag=5;
+                        break;
+                    case 'GRAB_L_LEG':
+                        tearLimb('LLeg', -200, -200); dHand1.tx -= 50; dHand1.ty += 50;
+                        nextPhase('TEAR_L_LEG', 0.4);
+                        break;
+                    case 'TEAR_L_LEG':
+                        dHand1.tx = cx + 20; dHand1.ty = cy + 20;
+                        nextPhase('APPROACH_R_LEG', 0.4);
+                        break;
+                    case 'APPROACH_R_LEG':
+                        nextPhase('GRAB_R_LEG', 0.5, sfx.bump); shakeTime=0.2; shakeMag=5;
+                        break;
+                    case 'GRAB_R_LEG':
+                        tearLimb('RLeg', 200, -200); dHand1.tx += 50; dHand1.ty += 50;
+                        nextPhase('TEAR_R_LEG', 0.4);
+                        break;
+                    case 'TEAR_R_LEG':
+                        dHand1.tx = cx; dHand1.ty = cy - 20; dHand2.tx = cx; dHand2.ty = cy + 20;
+                        nextPhase('APPROACH_TORSO', 0.5);
+                        break;
+                    case 'APPROACH_TORSO':
+                        nextPhase('GRAB_TORSO', 0.6, sfx.bump); shakeTime=0.3; shakeMag=10;
+                        break;
+                    case 'GRAB_TORSO':
+                        dHand1.ty -= 30; dHand2.ty += 30;
+                        nextPhase('STRETCH', 0.5, sfx.charge);
+                        break;
+                    case 'STRETCH':
+                        tearLimb('LowerTorso', 0, 0); 
+                        deathBloodAlpha = 1.0; dUpperY = cy; 
+                        for(let i=0; i<8; i++) guts.push({x: (Math.random()-0.5)*15, length: 20+Math.random()*60, sway: Math.random()*Math.PI*2});
+                        nextPhase('RIP', 1.5, sfx.earthquake); 
+                        shakeTime = 0.6; shakeMag = 35;
+                        dHand1.ty -= 150; dHand2.ty += 250;
+                        break;
+                    case 'RIP':
+                        camera.manualY = player.y + 100; camera.targetZoom = 2.5;
+                        nextPhase('PAN_DOWN', 1.5);
+                        break;
+                    case 'PAN_DOWN':
+                        nextPhase('FADE', 1.0); fadeOpacity = 0; 
+                        break;
+                    case 'FADE':
+                        triggerGameOver();
+                        break;
+                }
+            }
+
+            if (deathPhase === 'STRETCH') { shakeTime=0.1; shakeMag=8; }
+            if (deathPhase === 'RIP' || deathPhase === 'PAN_DOWN' || deathPhase === 'FADE') {
+                deathBloodAlpha = Math.max(0, deathBloodAlpha - dt * 0.5);
+                if (deathPhase === 'RIP') dUpperY -= 50 * dt;
+            }
+            return;
+        }
+
+        if (gameState !== 'PLAYING') return;
+        timeTimer += dt;
+        if (timeTimer >= 1) { timeLeft--; timeTimer = 0; updateHUD(); if (timeLeft <= 0) triggerDeathSequence(); }
+        if (shakeTime > 0) shakeTime -= dt;
+
+        player.update(dt, levelBlocks, enemies);
+        if (boss) boss.update(dt, levelBlocks, player, enemies); 
+        camera.update(dt); levelBlocks.forEach(b => b.update(dt)); enemies.forEach(e => e.update(dt, levelBlocks, player));
+    }
+
+    function draw() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        if (gameState === 'STORY_INTRO') {
+            storyTimer += lastTime / 1000 - (lastTime - 16)/1000; 
+            ctx.save(); ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (storyTimer > 1 && storyTimer < 3) {
+                let eyeAlpha = 0;
+                if (storyTimer < 1.5) eyeAlpha = (storyTimer - 1) * 2; 
+                else if (storyTimer > 2.5) eyeAlpha = (3 - storyTimer) * 2; 
+                else eyeAlpha = 1;
+                if (storyTimer > 2.2 && storyTimer < 2.3) eyeAlpha = 0; 
+                ctx.globalAlpha = eyeAlpha * 0.3; ctx.drawImage(assets.bgGiantEye, canvas.width/2 - 120, canvas.height/2 - 100); ctx.globalAlpha = 1.0;
+            }
+            if (storyTimer > 2.8 && storyTimer < 3.0) {
+                if (Math.random() > 0.3) {
+                    ctx.fillStyle = 'white'; ctx.globalCompositeOperation = 'difference'; ctx.fillRect(0, 0, canvas.width, canvas.height); 
+                    ctx.globalCompositeOperation = 'source-over'; ctx.translate((Math.random()-0.5)*20, (Math.random()-0.5)*20); if(Math.random() < 0.2) sfx.glitch();
+                }
+            }
+            ctx.restore();
+            if (storyTimer >= 5.5) { gameState = 'INTRO'; introTimer = 1.5; document.getElementById('game-container').classList.remove('intro-dark'); }
+            return; 
+        }
+
+        if (!bg || !camera || !player) return;
+
+        ctx.save();
+        const offsetX = (canvas.width - logicalWidth * scale) / 2; const offsetY = (canvas.height - logicalHeight * scale) / 2;
+        ctx.translate(offsetX, offsetY);
+        
+        if (shakeTime > 0) { ctx.translate((Math.random() - 0.5) * shakeMag, (Math.random() - 0.5) * shakeMag); }
+
+        ctx.translate(logicalWidth / 2, logicalHeight / 2);
+        ctx.scale(scale * camera.zoom, scale * camera.zoom);
+        ctx.translate(-logicalWidth / 2, -logicalHeight / 2);
+
+        bg.draw(ctx, camera.x); ctx.translate(-camera.x, -camera.y);
+
+        levelBlocks.forEach(b => b.draw(ctx)); enemies.forEach(e => e.draw(ctx));
+        if (boss && gameState !== 'STORY_OUTRO_FAKE' && gameState !== 'STORY_OUTRO') boss.draw(ctx); 
+        if (trueBoss) trueBoss.draw(ctx); 
+
+        if (isBossLevel || gameState === 'TRUE_BOSS_FIGHT') {
+            ctx.save();
+            let isRage = (boss && boss.phase === 3) || (trueBoss && trueBoss.phase === 3);
+            let pCenter = { x: player.x + player.w/2, y: player.y + player.h/2 };
+            
+            let lightGrad = ctx.createRadialGradient(pCenter.x, pCenter.y, 50, pCenter.x, pCenter.y, 800);
+            lightGrad.addColorStop(0, 'rgba(0,0,0,0)'); 
+            lightGrad.addColorStop(1, isRage ? 'rgba(50,0,0,0.7)' : 'rgba(0,0,30,0.85)'); 
+            
+            ctx.fillStyle = lightGrad;
+            ctx.globalCompositeOperation = 'source-over'; 
+            ctx.fillRect(camera.x - 2000, camera.y - 2000, 5000, 5000); 
+            ctx.restore();
+        }
+        
+        if (gameState !== 'STORY_INTRO' && gameState !== 'DYING') {
+            player.draw(ctx);
+        }
+
+        // 🔥 PROCEDURAL SLICED DISMEMBERMENT DRAWING
+        if (gameState === 'DYING') {
+            let cx = player.x + 13;
+            let cy = (['RIP', 'PAN_DOWN', 'FADE'].includes(deathPhase)) ? dUpperY : player.y + 38;
+            
+            let isScreaming = ['TEAR_L_ARM', 'APPROACH_R_ARM', 'GRAB_R_ARM', 'TEAR_R_ARM', 'APPROACH_L_LEG', 'GRAB_L_LEG', 'TEAR_L_LEG', 'APPROACH_R_LEG', 'GRAB_R_LEG', 'TEAR_R_LEG', 'APPROACH_TORSO', 'GRAB_TORSO', 'STRETCH', 'RIP', 'PAN_DOWN', 'FADE'].includes(deathPhase);
+            let img = isScreaming ? assets.playerScream : assets.playerIdle;
+
+            if (bloodPuddle.length > 0) {
+                ctx.fillStyle = '#500000'; 
+                bloodPuddle.forEach(p => { ctx.beginPath(); ctx.ellipse(p.x, player.y + 38, p.w, p.h, 0, 0, Math.PI*2); ctx.fill(); });
+            }
+
+            flyingLimbs.forEach(l => {
+                ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.rot);
+                if (!player.facingRight) ctx.scale(-1, 1);
+                drawPlayerPiece(ctx, assets.playerIdle, l.type, 0, 0); 
+                ctx.restore();
+            });
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            if (!player.facingRight) ctx.scale(-1, 1);
+            if (deathPhase === 'STRETCH') {
+                let stretchY = Math.max(1, (dHand2.y - dHand1.y) / 80); 
+                ctx.scale(1 / Math.sqrt(stretchY), stretchY);
+            }
+
+            if (p_Limbs.UpperTorso) drawPlayerPiece(ctx, img, 'UpperTorso', 0, 0);
+            if (p_Limbs.LowerTorso) drawPlayerPiece(ctx, img, 'LowerTorso', 0, 0);
+            if (p_Limbs.LArm) drawPlayerPiece(ctx, img, 'LArm', 0, 0);
+            if (p_Limbs.RArm) drawPlayerPiece(ctx, img, 'RArm', 0, 0);
+            if (p_Limbs.LLeg) drawPlayerPiece(ctx, img, 'LLeg', 0, 0);
+            if (p_Limbs.RLeg) drawPlayerPiece(ctx, img, 'RLeg', 0, 0);
+
+            if (!p_Limbs.LowerTorso && ['RIP', 'PAN_DOWN', 'FADE'].includes(deathPhase)) {
+                ctx.strokeStyle = '#8B0000'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+                guts.forEach(g => {
+                    ctx.beginPath(); ctx.moveTo((Math.random()-0.5)*10, -17); 
+                    g.sway += 0.2; let endX = g.x + Math.sin(g.sway)*5;
+                    ctx.quadraticCurveTo(endX * 2, -17 + g.length/2, endX, -17 + g.length);
+                    ctx.stroke();
+                });
+            }
+            ctx.restore();
+
+            let hw = 120, hh = 150;
+            ctx.save(); ctx.translate(dHand1.x, dHand1.y); ctx.scale(0.85, 1);
+            ctx.drawImage(assets.bossHand, -hw/2, -hh/2, hw, hh); ctx.restore();
+            
+            ctx.save(); ctx.translate(dHand2.x, dHand2.y); ctx.scale(0.85, -1);
+            ctx.drawImage(assets.bossHand, -hw/2, -hh/2, hw, hh); ctx.restore();
+        }
+
+        effects.forEach(e => e.draw(ctx)); texts.forEach(t => t.draw(ctx)); 
+        
+        ctx.restore(); 
+
+        if (hitFlashTimer > 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${hitFlashTimer / 0.15})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        if (gameState === 'INTRO' || gameState === 'BOSS_INTRO' || gameState === 'TRUE_BOSS_INTRO') {
+            ctx.save();
+            ctx.globalAlpha = gameState === 'INTRO' ? Math.max(0, introTimer / 1.0) : 0; 
+            ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#000000'; ctx.lineWidth = 6;
+            ctx.font = '900 60px Nunito'; ctx.textAlign = 'center';
+            const introText = isBossLevel ? "BOSS STAGE" : `LEVEL 1-${currentLevelIndex + 1}`;
+            ctx.strokeText(introText, canvas.width / 2, canvas.height / 2); ctx.fillText(introText, canvas.width / 2, canvas.height / 2);
+            
+            if (gameState === 'BOSS_INTRO') {
+                ctx.globalAlpha = Math.max(0, bossIntroTimer / 3.0); ctx.fillStyle = '#FF0000'; let offset = (Math.random() - 0.5) * 5; 
+                ctx.strokeText("WARNING: THE FALLEN EYE", canvas.width / 2 + offset, canvas.height / 2 - 80 + offset); ctx.fillText("WARNING: THE FALLEN EYE", canvas.width / 2 + offset, canvas.height / 2 - 80 + offset);
+            }
+            if (gameState === 'TRUE_BOSS_INTRO' && storyTimer > 4.0) {
+                let trueAlpha = Math.min(1.0, (storyTimer - 4.0) / 2.0); ctx.globalAlpha = trueAlpha; ctx.fillStyle = '#FF0000';
+                ctx.strokeText("THE REAL ONE AWAKENS.", canvas.width / 2, canvas.height / 2 + 100); ctx.fillText("THE REAL ONE AWAKENS.", canvas.width / 2, canvas.height / 2 + 100);
+            }
+            ctx.restore();
+        }
+
+        if (whiteFlash > 0) { ctx.fillStyle = `rgba(255, 255, 255, ${whiteFlash})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+
+        if (gameState === 'STORY_OUTRO') {
+            if (storyTimer > 5) { let fade = Math.min(1, (storyTimer - 5) / 3); ctx.fillStyle = `rgba(0, 0, 0, ${fade})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+        }
+
+        if (deathBloodAlpha > 0) {
+            let overlayAlpha = deathBloodAlpha * 0.9;
+            ctx.fillStyle = `rgba(139, 0, 0, ${overlayAlpha})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 50, canvas.width/2, canvas.height/2, canvas.width/1.5);
+            grad.addColorStop(0, 'transparent');
+            grad.addColorStop(1, `rgba(100, 0, 0, ${deathBloodAlpha})`);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        if (fadeOpacity > 0 && gameState !== 'STORY_OUTRO') { ctx.fillStyle = `rgba(0, 0, 0, ${fadeOpacity})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    }
+
+    function gameLoop(timestamp) {
+        let dt = (timestamp - lastTime) / 1000;
+        lastTime = timestamp; if (dt > 0.05) dt = 0.05; 
+
+        if (hitStopTimer > 0) {
+            hitStopTimer -= dt;
+            draw(); 
+            requestAnimationFrame(gameLoop);
+            return;
+        }
+
+        update(dt); draw(); requestAnimationFrame(gameLoop);
+    }
+
+    ['btn-start', 'btn-restart-level', 'btn-restart-full', 'btn-play-again', 'btn-next-level'].forEach(id => {
+        let el = document.getElementById(id);
+        if (el) el.addEventListener('click', function() { this.blur(); });
+    });
+
+    document.getElementById('btn-start').addEventListener('click', () => { if (audioCtx.state === 'suspended') audioCtx.resume(); initGame('FULL'); });
+    document.getElementById('btn-restart-level').addEventListener('click', () => initGame('LEVEL'));
+    document.getElementById('btn-restart-full').addEventListener('click', () => initGame('FULL'));
+    document.getElementById('btn-play-again').addEventListener('click', () => initGame('FULL'));
+    document.getElementById('btn-next-level').addEventListener('click', () => { currentLevelIndex++; initGame('NEXT'); });
+
+    requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
